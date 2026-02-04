@@ -67,10 +67,11 @@ def fetch_movies(language_code, pages=5):
                     "poster_url": IMAGE_BASE_URL + m["poster_path"] if m.get("poster_path") else None,
                     "rating": m.get("vote_average"),
                     "release_date": m.get("release_date"),
-                    "language": language_code
+                    "language": m.get("original_language")
                 })
         time.sleep(1.5)
     return movies
+
 def search_movie_tmdb(movie_name):
     response = session.get(
         f"{BASE_URL}/search/movie",
@@ -89,6 +90,23 @@ def search_movie_tmdb(movie_name):
         return data["results"][0]  # best match
     return None
 
+def search_movies_tmdb(movie_name, page=1):
+    response = session.get(
+        f"{BASE_URL}/search/movie",
+        params={
+            "api_key": API_KEY,
+            "query": movie_name,
+            "page": page,
+            "include_adult": True
+        },
+        timeout=10
+    )
+
+    if response.status_code != 200:
+        return []
+
+    data = response.json()
+    return data.get("results", [])
 
 # =========================
 # BUILD DATASET
@@ -122,7 +140,7 @@ cosine_sim = cosine_similarity(tfidf_matrix)
 # =========================
 # RECOMMENDATION FUNCTION
 # =========================
-def recommend(movie_title, top_n=5):
+def recommend(movie_title, top_n=30):
     movie_title = movie_title.lower().strip()
     titles = movies_df["title"].str.lower()
 
@@ -140,11 +158,20 @@ def recommend(movie_title, top_n=5):
             "rating": tmdb_movie["vote_average"],
             "release_date": tmdb_movie["release_date"],
             "language": tmdb_movie["original_language"]
+            
         }
 
         rebuild_similarity()
         titles = movies_df["title"].str.lower()
-    idx = titles[titles == movie_title.lower()].index[0]
+        movie_title = tmdb_movie["title"].lower()
+
+    matched_indices = titles[titles.str.contains(movie_title, regex=False)].index
+
+    if len(matched_indices) == 0:
+        return []   # no match found safely
+
+    idx = matched_indices[0]
+
 
     similarity_scores = list(enumerate(cosine_sim[idx]))
     similarity_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
