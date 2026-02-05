@@ -19,11 +19,47 @@ LANGUAGES = {
     "Hindi": "hi-IN",
     "Tamil": "ta-IN",
     "Telugu": "te-IN",
-    "Korean": "ko-KR",
-    "Punjabi": "pa-IN"
+    "Korean": "ko-KR"
 }
 
-PAGES_PER_LANGUAGE = 6
+GENRE_MAP = {
+    28: "Action",
+    12: "Adventure",
+    16: "Animation",
+    35: "Comedy",
+    80: "Crime",
+    99: "Documentary",
+    18: "Drama",
+    10751: "Family",
+    14: "Fantasy",
+    36: "History",
+    27: "Horror",
+    10402: "Music",
+    9648: "Mystery",
+    10749: "Romance",
+    878: "Science-Fiction",
+    10770: "Tv-Movie",
+    53: "Thriller",
+    10752: "War",
+    37: "Western"
+}
+
+PAGES_PER_LANGUAGE ={
+    "en-US": 6,
+    "hi-IN": 12,
+    "ta-IN": 10,
+    "te-IN": 10,
+    "ko-KR": 8
+}
+
+ORIGINAL_LANG_MAP = {
+    "en-US": None,   # English → no restriction
+    "hi-IN": "hi",
+    "ta-IN": "ta",
+    "te-IN": "te",
+    "ko-KR": "ko"
+}
+
 session = requests.Session()
 
 retry = Retry(
@@ -41,14 +77,18 @@ def fetch_movies(language_code, pages=5):
     movies = []
 
     for page in range(1, pages + 1):
-        response = session.get(
-            f"{BASE_URL}/discover/movie",
-            params={
+        params={
                 "api_key": API_KEY,
-                "language": language_code,
+                "language": "en-US",
                 "sort_by": "popularity.desc",
                 "page": page
-            },
+            }
+        original_lang= ORIGINAL_LANG_MAP.get(language_code)
+        if original_lang:
+            params["with_original_language"] = original_lang
+        response = session.get(
+            f"{BASE_URL}/discover/movie",
+            params=params,
             timeout=10
         )
         if response.status_code != 200:
@@ -62,9 +102,15 @@ def fetch_movies(language_code, pages=5):
 
 
         for m in data["results"]:
+                genre_ids = m.get("genre_ids", [])
+                genre_names = [GENRE_MAP.get(g) for g in genre_ids if g in GENRE_MAP]
+                genre_text = " ".join(genre_names)
+
+                combined_text = (m.get("overview") or "") or " " + genre_text
+
                 movies.append({
                     "title": m.get("title"),
-                    "overview": m.get("overview", ""),
+                    "overview": combined_text,
                     "poster_url": IMAGE_BASE_URL + m["poster_path"] if m.get("poster_path") else None,
                     "rating": m.get("vote_average"),
                     "release_date": m.get("release_date"),
@@ -115,8 +161,9 @@ def search_movies_tmdb(movie_name, page=1):
 all_movies = []
 
 for lang, code in LANGUAGES.items():
+    pages = PAGES_PER_LANGUAGE.get(code, 5)
     print(f"Fetching {lang} movies...")
-    all_movies.extend(fetch_movies(code, PAGES_PER_LANGUAGE))
+    all_movies.extend(fetch_movies(code, pages))
 
 movies_df = pd.DataFrame(all_movies)
 movies_df.dropna(subset=["overview"], inplace=True)
@@ -141,7 +188,7 @@ cosine_sim = cosine_similarity(tfidf_matrix)
 # =========================
 # RECOMMENDATION FUNCTION
 # =========================
-def recommend(movie_title, top_n=30):
+def recommend(movie_title, top_n=30,language_filter=None):
     movie_title = movie_title.lower().strip()
     titles = movies_df["title"].str.lower()
 
@@ -172,14 +219,38 @@ def recommend(movie_title, top_n=30):
         return []   # no match found safely
 
     idx = matched_indices[0]
-
+    selected_title = movies_df.iloc[idx]["title"]
 
     similarity_scores = list(enumerate(cosine_sim[idx]))
-    similarity_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
+
+    # apply language conditioning
+    if language_filter:
+        similarity_scores = [
+            (i, score)
+            for i, score in similarity_scores
+            if movies_df.iloc[i]["language"] == language_filter
+            and movies_df.iloc[i]["title"] != selected_title
+        ]
+    else:
+        similarity_scores = [
+            (i, score)
+            for i, score in similarity_scores
+            if movies_df.iloc[i]["title"] != selected_title
+        ]
+    # sort after conditioning
+    similarity_scores = sorted(
+        similarity_scores,
+        key=lambda x: x[1],
+        reverse=True
+    )
 
     recommendations = []
-    for i in similarity_scores[1:top_n + 1]:
-        movie = movies_df.iloc[i[0]]
+    seen_titles = set()
+    for i, _ in similarity_scores:
+        movie = movies_df.iloc[i]
+        if movie["title"] in seen_titles:
+            continue
+        seen_titles.add(movie["title"])
         recommendations.append({
             "title": movie["title"],
             "overview": movie["overview"],
@@ -188,6 +259,8 @@ def recommend(movie_title, top_n=30):
             "release_date": movie["release_date"],
             "language": movie["language"]
         })
+        if len(recommendations) >= top_n:
+            break
 
     return recommendations
 

@@ -45,7 +45,8 @@ LANGUAGE_MAP = {
     "bn": "Bengali",
     "mr": "Marathi",
     "pa": "Punjabi",
-    "th": "Thai"
+    "th": "Thai",
+    "kn": "Kannada"
 }
 
 st.set_page_config(page_title="Movie Recommender", layout="wide")
@@ -141,6 +142,36 @@ if movie_name.strip():
 if "selected_movie" in st.session_state:
     selected_movie_title = st.session_state.selected_movie
     st.subheader(f"Recommendations based on: **{selected_movie_title}**")
+
+    # 🔽 Language filter
+    filter_option = st.selectbox(
+        "Filter by language",
+        options=["All"] + list(LANGUAGE_MAP.values())
+    )
+
+    if "last_filter_option" not in st.session_state:
+        st.session_state.last_filter_option = "All"
+
+    results = st.session_state.all_recommendations
+
+    if filter_option != st.session_state.last_filter_option:
+        st.session_state.last_filter_option = filter_option
+
+        if filter_option == "All":
+            st.session_state.all_recommendations = recommend(
+                selected_movie_title
+            )
+        else:
+            selected_lang_code = next(
+                (k for k, v in LANGUAGE_MAP.items() if v == filter_option),
+                None
+            )
+            st.session_state.all_recommendations = recommend(
+                selected_movie_title,
+                language_filter=selected_lang_code
+            )
+
+        st.session_state.rec_display_count = 5  # 🔑 reset ONLY on change
 
     results = st.session_state.all_recommendations
 
