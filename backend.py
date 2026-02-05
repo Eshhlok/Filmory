@@ -19,10 +19,11 @@ LANGUAGES = {
     "Hindi": "hi-IN",
     "Tamil": "ta-IN",
     "Telugu": "te-IN",
-    "Korean": "ko-KR"
+    "Korean": "ko-KR",
+    "Punjabi": "pa-IN"
 }
 
-PAGES_PER_LANGUAGE = 5
+PAGES_PER_LANGUAGE = 6
 session = requests.Session()
 
 retry = Retry(
@@ -69,7 +70,7 @@ def fetch_movies(language_code, pages=5):
                     "release_date": m.get("release_date"),
                     "language": m.get("original_language")
                 })
-        time.sleep(1.5)
+        time.sleep(0.5)
     return movies
 
 def search_movie_tmdb(movie_name):
