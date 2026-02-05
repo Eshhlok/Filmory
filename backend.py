@@ -68,6 +68,9 @@ retry = Retry(
     status_forcelist=[429, 500, 502, 503, 504]
 )
 
+CAST_CACHE = {}
+DIRECTOR_CACHE = {}
+
 adapter = HTTPAdapter(max_retries=retry)
 session.mount("https://", adapter)
 # =========================
@@ -109,6 +112,7 @@ def fetch_movies(language_code, pages=5):
                 combined_text = (m.get("overview") or "") or " " + genre_text
 
                 movies.append({
+                    "id": m.get("id"),
                     "title": m.get("title"),
                     "overview": combined_text,
                     "poster_url": IMAGE_BASE_URL + m["poster_path"] if m.get("poster_path") else None,
@@ -155,6 +159,35 @@ def search_movies_tmdb(movie_name, page=1):
     data = response.json()
     return data.get("results", [])
 
+
+def get_cast_and_director(movie_id):
+    if movie_id in CAST_CACHE:
+        return CAST_CACHE[movie_id], DIRECTOR_CACHE[movie_id]
+    response = session.get(
+        f"{BASE_URL}/movie/{movie_id}/credits",
+        params={"api_key": API_KEY},
+        timeout=10
+    )
+
+    if response.status_code != 200:
+        CAST_CACHE[movie_id] = []
+        DIRECTOR_CACHE[movie_id] = []
+        return [], []
+
+    data = response.json()
+
+    cast = [c["name"] for c in data.get("cast", [])[:10]]
+    director = [
+        c["name"] for c in data.get("crew", [])
+        if c.get("job") == "Director"
+    ]
+
+    CAST_CACHE[movie_id] = cast
+    DIRECTOR_CACHE[movie_id] = director
+
+    return cast, director
+
+
 # =========================
 # BUILD DATASET
 # =========================
@@ -176,6 +209,13 @@ def rebuild_similarity():
     tfidf_matrix = tfidf.fit_transform(movies_df["overview"])
     cosine_sim = cosine_similarity(tfidf_matrix)
 
+def cast_similarity(cast_a, cast_b):
+    return len(set(cast_a) & set(cast_b))
+
+
+def director_similarity(dir_a, dir_b):
+    return len(set(dir_a) & set(dir_b))
+
 
 # =========================
 # ML PIPELINE
@@ -188,7 +228,7 @@ cosine_sim = cosine_similarity(tfidf_matrix)
 # =========================
 # RECOMMENDATION FUNCTION
 # =========================
-def recommend(movie_title, top_n=30,language_filter=None):
+def recommend(movie_title, top_n=30,language_filter=None,mode="story"):
     movie_title = movie_title.lower().strip()
     titles = movies_df["title"].str.lower()
 
@@ -219,49 +259,109 @@ def recommend(movie_title, top_n=30,language_filter=None):
         return []   # no match found safely
 
     idx = matched_indices[0]
-    selected_title = movies_df.iloc[idx]["title"]
-
-    similarity_scores = list(enumerate(cosine_sim[idx]))
-
-    # apply language conditioning
-    if language_filter:
-        similarity_scores = [
-            (i, score)
-            for i, score in similarity_scores
-            if movies_df.iloc[i]["language"] == language_filter
-            and movies_df.iloc[i]["title"] != selected_title
-        ]
-    else:
-        similarity_scores = [
-            (i, score)
-            for i, score in similarity_scores
-            if movies_df.iloc[i]["title"] != selected_title
-        ]
-    # sort after conditioning
-    similarity_scores = sorted(
-        similarity_scores,
-        key=lambda x: x[1],
-        reverse=True
-    )
-
+    seed_movie = movies_df.iloc[idx]
+    selected_title = seed_movie["title"]
     recommendations = []
     seen_titles = set()
-    for i, _ in similarity_scores:
-        movie = movies_df.iloc[i]
-        if movie["title"] in seen_titles:
-            continue
-        seen_titles.add(movie["title"])
-        recommendations.append({
-            "title": movie["title"],
-            "overview": movie["overview"],
-            "poster_url": movie["poster_url"],
-            "rating": movie["rating"],
-            "release_date": movie["release_date"],
-            "language": movie["language"]
-        })
-        if len(recommendations) >= top_n:
-            break
+    if(mode =="story"):
+        similarity_scores = list(enumerate(cosine_sim[idx]))
 
+        # apply language conditioning
+        if language_filter:
+            similarity_scores = [
+                (i, score)
+                for i, score in similarity_scores
+                if movies_df.iloc[i]["language"] == language_filter
+                and movies_df.iloc[i]["title"] != selected_title
+            ]
+        else:
+            similarity_scores = [
+                (i, score)
+                for i, score in similarity_scores
+                if movies_df.iloc[i]["title"] != selected_title
+            ]
+        # sort after conditioning
+        similarity_scores = sorted(
+            similarity_scores,
+            key=lambda x: x[1],
+            reverse=True
+        )
+
+    
+        for i, _ in similarity_scores:
+            movie = movies_df.iloc[i]
+            if movie["title"] in seen_titles:
+                continue
+            seen_titles.add(movie["title"])
+            recommendations.append({
+                "title": movie["title"],
+                "overview": movie["overview"],
+                "poster_url": movie["poster_url"],
+                "rating": movie["rating"],
+                "release_date": movie["release_date"],
+                "language": movie["language"]
+            })
+            if len(recommendations) >= top_n:
+                break
+    # =========================
+    # CAST / DIRECTOR MODE (NEW)
+    # =========================
+    else:
+        if pd.isna(seed_movie.get("id")):
+            return []
+        seed_cast, seed_director = get_cast_and_director(seed_movie["id"])
+        scored = []
+
+        for _, row in movies_df.iterrows():
+            if row["title"] == selected_title:
+                continue
+            if pd.isna(row.get("id")):
+                continue
+            if language_filter and row["language"] != language_filter:
+                continue
+
+            cast, director = get_cast_and_director(row["id"])
+            score = 0
+            if mode == "cast":
+                shared_cast = set(seed_cast) & set(cast)
+
+                for actor in shared_cast:
+                    if actor == seed_cast[0]:      # ⭐ lead actor (SRK for DDLJ)
+                        score += 5
+                    else:
+                        score += 1
+
+            else:  # director mode
+                score = len(set(seed_director) & set(director)) * 5
+
+            if score > 0:
+                scored.append((
+                    row,
+                    score,
+                    row.get("rating", 0)
+                ))
+
+        scored.sort(
+            key=lambda x:(x[1], x[2]), 
+            reverse=True
+        )
+
+        for row, *_ in scored:
+            if row["title"] in seen_titles:
+                continue
+
+            seen_titles.add(row["title"])
+            recommendations.append({
+                "title": row["title"],
+                "overview": row["overview"],
+                "poster_url": row["poster_url"],
+                "rating": row["rating"],
+                "release_date": row["release_date"],
+                "language": row["language"]
+            })
+
+            if len(recommendations) >= top_n:
+                break
     return recommendations
 
 
@@ -281,4 +381,4 @@ if __name__ == "__main__":
             print("📅 Release:", r["release_date"])
             print("🌍 Language:", r["language"])
             print("📝", r["overview"][:150], "...")
-# Feature branch: experimenting with advanced recommendations
+

@@ -49,6 +49,13 @@ LANGUAGE_MAP = {
     "kn": "Kannada"
 }
 
+REC_MODE_MAP = {
+    "Story (Plot based)": "story",
+    "Cast based": "cast",
+    "Director based": "director"
+}
+
+
 st.set_page_config(page_title="Movie Recommender", layout="wide")
 
 st.title("🎬 Movie Recommendation System")
@@ -143,6 +150,16 @@ if "selected_movie" in st.session_state:
     selected_movie_title = st.session_state.selected_movie
     st.subheader(f"Recommendations based on: **{selected_movie_title}**")
 
+    # 🔽 Recommendation mode
+    rec_mode_label = st.selectbox(
+        "🎯 Recommendation type",
+        list(REC_MODE_MAP.keys())
+    )
+    rec_mode = REC_MODE_MAP[rec_mode_label]
+    if "last_rec_mode" not in st.session_state:
+        st.session_state.last_rec_mode = rec_mode
+    
+
     # 🔽 Language filter
     filter_option = st.selectbox(
         "Filter by language",
@@ -152,14 +169,14 @@ if "selected_movie" in st.session_state:
     if "last_filter_option" not in st.session_state:
         st.session_state.last_filter_option = "All"
 
-    results = st.session_state.all_recommendations
-
-    if filter_option != st.session_state.last_filter_option:
-        st.session_state.last_filter_option = filter_option
-
+    if (
+        filter_option != st.session_state.last_filter_option
+        or rec_mode != st.session_state.last_rec_mode
+    ):
         if filter_option == "All":
             st.session_state.all_recommendations = recommend(
-                selected_movie_title
+                selected_movie_title,
+                mode=rec_mode
             )
         else:
             selected_lang_code = next(
@@ -168,10 +185,14 @@ if "selected_movie" in st.session_state:
             )
             st.session_state.all_recommendations = recommend(
                 selected_movie_title,
-                language_filter=selected_lang_code
+                language_filter=selected_lang_code,
+                mode=rec_mode
             )
 
-        st.session_state.rec_display_count = 5  # 🔑 reset ONLY on change
+        st.session_state.last_filter_option = filter_option
+        st.session_state.last_rec_mode = rec_mode
+        st.session_state.rec_display_count = 5
+
 
     results = st.session_state.all_recommendations
 
