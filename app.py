@@ -109,7 +109,7 @@ if movie_name.strip():
                 if movie.get("poster_path"):
                     st.image(
                         "https://image.tmdb.org/t/p/w300" + movie["poster_path"],
-                        use_container_width=True
+                        width="stretch"
                     )
                 else:
                     st.write("No Image")
@@ -127,7 +127,7 @@ if movie_name.strip():
         left, center, right = st.columns([3, 2, 3])
 
         with center:
-            if st.button("Load more", use_container_width=True):
+            if st.button("Load more", width="stretch"):
                 if st.session_state.display_count < len(st.session_state.search_results):
                     st.session_state.display_count += 5
                 else:
@@ -183,7 +183,7 @@ if "selected_movie" in st.session_state:
 
             with col1:
                 if movie["poster_url"]:
-                    st.image(movie["poster_url"], use_container_width=True)
+                    st.image(movie["poster_url"], width="stretch")
                 else:
                     st.write("No Image")
 
@@ -202,7 +202,7 @@ if "selected_movie" in st.session_state:
             with center:
                 if st.button(
                     "Load more recommendations",
-                    use_container_width=True
+                    width="stretch"
                 ):
                     st.session_state.rec_display_count += 5
                     st.rerun()
