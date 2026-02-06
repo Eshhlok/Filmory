@@ -7,6 +7,9 @@ from urllib3.util.retry import Retry
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from tmdb_client import get_cast_and_director, search_movies_tmdb
+
+
 # =========================
 # CONFIG
 # =========================
@@ -68,8 +71,7 @@ retry = Retry(
     status_forcelist=[429, 500, 502, 503, 504]
 )
 
-CAST_CACHE = {}
-DIRECTOR_CACHE = {}
+
 
 adapter = HTTPAdapter(max_retries=retry)
 session.mount("https://", adapter)
@@ -140,53 +142,6 @@ def search_movie_tmdb(movie_name):
     if data["results"]:
         return data["results"][0]  # best match
     return None
-
-def search_movies_tmdb(movie_name, page=1):
-    response = session.get(
-        f"{BASE_URL}/search/movie",
-        params={
-            "api_key": API_KEY,
-            "query": movie_name,
-            "page": page,
-            "include_adult": True
-        },
-        timeout=10
-    )
-
-    if response.status_code != 200:
-        return []
-
-    data = response.json()
-    return data.get("results", [])
-
-
-def get_cast_and_director(movie_id):
-    if movie_id in CAST_CACHE:
-        return CAST_CACHE[movie_id], DIRECTOR_CACHE[movie_id]
-    response = session.get(
-        f"{BASE_URL}/movie/{movie_id}/credits",
-        params={"api_key": API_KEY},
-        timeout=10
-    )
-
-    if response.status_code != 200:
-        CAST_CACHE[movie_id] = []
-        DIRECTOR_CACHE[movie_id] = []
-        return [], []
-
-    data = response.json()
-
-    cast = [c["name"] for c in data.get("cast", [])[:10]]
-    director = [
-        c["name"] for c in data.get("crew", [])
-        if c.get("job") == "Director"
-    ]
-
-    CAST_CACHE[movie_id] = cast
-    DIRECTOR_CACHE[movie_id] = director
-
-    return cast, director
-
 
 # =========================
 # BUILD DATASET

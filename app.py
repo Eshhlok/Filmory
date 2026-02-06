@@ -1,5 +1,6 @@
 import streamlit as st
-from backend import recommend,search_movies_tmdb
+from backend import recommend
+from tmdb_client import search_movies_tmdb
 
 LANGUAGE_MAP = {
     "en": "English",
