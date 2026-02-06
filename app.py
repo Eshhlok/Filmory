@@ -80,6 +80,13 @@ if "rec_display_count" not in st.session_state:
 if "all_recommendations" not in st.session_state:
     st.session_state.all_recommendations = []
 
+if "has_more_search_results" not in st.session_state:
+    st.session_state.has_more_search_results = True
+
+if "should_fetch_search_page" not in st.session_state:
+    st.session_state.should_fetch_search_page = True
+
+
 # User input
 movie_name = st.text_input(
     "🔍 Search for a movie",
@@ -91,23 +98,28 @@ if movie_name != st.session_state.last_query:
     st.session_state.search_results = []
     st.session_state.display_count = 5
     st.session_state.last_query = movie_name
+    st.session_state.has_more_search_results = True
+    st.session_state.should_fetch_search_page = True
 
 
 # ======================
 # SEARCH RESULTS STAGE
 # ======================
 if movie_name.strip():
-    new_results = search_movies_tmdb(
-        movie_name,
-        page=st.session_state.search_page
-    )
-
-    # append new results (avoid duplicates)
-    existing_ids = {m["id"] for m in st.session_state.search_results}
-    for movie in new_results:
-        if movie["id"] not in existing_ids:
-            st.session_state.search_results.append(movie)
-
+    if st.session_state.should_fetch_search_page and st.session_state.has_more_search_results:
+        new_results = search_movies_tmdb(
+            movie_name,
+            page=st.session_state.search_page
+        )
+        if(not new_results):
+            st.session_state.has_more_search_results = False
+        else:
+            # append new results (avoid duplicates)
+            existing_ids = {m["id"] for m in st.session_state.search_results}
+            for movie in new_results:
+                if movie["id"] not in existing_ids:
+                    st.session_state.search_results.append(movie)
+        st.session_state.should_fetch_search_page = False
     if st.session_state.search_results:
         st.caption("Select the movie you meant:")
 
@@ -132,16 +144,18 @@ if movie_name.strip():
 
 
         # LOAD MORE BUTTON
-        left, center, right = st.columns([3, 2, 3])
+        if st.session_state.has_more_search_results:
+            left, center, right = st.columns([3, 2, 3])
 
-        with center:
-            if st.button("Load more", width="stretch"):
-                if st.session_state.display_count < len(st.session_state.search_results):
-                    st.session_state.display_count += 5
-                else:
-                    st.session_state.search_page += 1
-
-                st.rerun()
+            with center:
+                if st.button("Load more", width="stretch"):
+                    if st.session_state.display_count < len(st.session_state.search_results):
+                        st.session_state.display_count += 5
+                    else:
+                        st.session_state.search_page += 1
+                        st.session_state.should_fetch_search_page = True
+                        
+                    st.rerun()
 
 # ======================
 # RECOMMENDATION STAGE
