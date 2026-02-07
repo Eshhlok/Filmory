@@ -2,6 +2,7 @@ import streamlit as st
 from recommender import recommend
 from backend import movies_df,cosine_sim
 from tmdb_client import search_movies_tmdb
+from config import GENRE_MAP
 
 LANGUAGE_MAP = {
     "en": "English",
@@ -54,7 +55,8 @@ LANGUAGE_MAP = {
 REC_MODE_MAP = {
     "Story (Plot based)": "story",
     "Cast based": "cast",
-    "Director based": "director"
+    "Director based": "director",
+    "Genre based": "genre"
 }
 
 
@@ -220,6 +222,14 @@ if "selected_movie" in st.session_state:
 
     results = st.session_state.all_recommendations
 
+    if rec_mode != "story":
+        results = sorted(
+            results,
+            key=lambda x: x.get("rating") or 0,
+            reverse=True 
+        )
+
+
     if not results:
         st.info("No close matches found.")
     else:
@@ -240,7 +250,12 @@ if "selected_movie" in st.session_state:
                 lang_name = LANGUAGE_MAP.get(lang_code, lang_code.upper())
                 st.write(f"🔊 Original Audio: {lang_name}")
                 st.write(movie["overview"])
-
+                if rec_mode == "genre":
+                    genre_names = [
+                        GENRE_MAP.get(gid, str(gid))
+                        for gid in movie.get("genres", [])
+                    ]
+                    st.write("🎭 Genres:", ", ".join(genre_names))
         # LOAD MORE RECOMMENDATIONS (CENTERED)
         if st.session_state.rec_display_count < len(results):
             left, center, right = st.columns([3, 2, 3])
