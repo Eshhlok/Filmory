@@ -2,6 +2,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import time
+from functools import lru_cache
 
 session = requests.Session()
 retry = Retry(
@@ -39,6 +40,7 @@ def search_movies_tmdb(query, page=1):
         # Network / SSL / connection reset → fail gracefully
         return []
 
+@lru_cache(maxsize=1024)
 def get_cast_and_director(movie_id):
     if not movie_id:
         return [], []

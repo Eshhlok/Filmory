@@ -1,5 +1,6 @@
 import streamlit as st
-from backend import recommend
+from recommender import recommend
+from backend import movies_df,cosine_sim
 from tmdb_client import search_movies_tmdb
 
 LANGUAGE_MAP = {
@@ -140,7 +141,11 @@ if movie_name.strip():
                 ):
                     st.session_state.selected_movie = movie["title"]
                     st.session_state.rec_display_count = 5
-                    st.session_state.all_recommendations = recommend(movie["title"])
+                    st.session_state.all_recommendations = recommend(
+                        movies_df,
+                        cosine_sim,
+                        movie["title"]
+                        )
 
 
         # LOAD MORE BUTTON
@@ -190,6 +195,8 @@ if "selected_movie" in st.session_state:
     ):
         if filter_option == "All":
             st.session_state.all_recommendations = recommend(
+                movies_df,
+                cosine_sim,
                 selected_movie_title,
                 mode=rec_mode
             )
@@ -199,6 +206,8 @@ if "selected_movie" in st.session_state:
                 None
             )
             st.session_state.all_recommendations = recommend(
+                movies_df,
+                cosine_sim,
                 selected_movie_title,
                 language_filter=selected_lang_code,
                 mode=rec_mode
