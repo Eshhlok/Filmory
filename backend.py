@@ -8,6 +8,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from tmdb_client import get_cast_and_director, search_movies_tmdb
+from text_similarity import build_text_similarity, get_story_similarities
 
 
 # =========================
@@ -156,7 +157,7 @@ for lang, code in LANGUAGES.items():
 movies_df = pd.DataFrame(all_movies)
 movies_df.dropna(subset=["overview"], inplace=True)
 movies_df.reset_index(drop=True, inplace=True)
-
+build_text_similarity(movies_df)
 print(f"Total movies loaded: {len(movies_df)}")
 
 def rebuild_similarity():
@@ -219,7 +220,7 @@ def recommend(movie_title, top_n=30,language_filter=None,mode="story"):
     recommendations = []
     seen_titles = set()
     if(mode =="story"):
-        similarity_scores = list(enumerate(cosine_sim[idx]))
+        similarity_scores = get_story_similarities(idx)
 
         # apply language conditioning
         if language_filter:
