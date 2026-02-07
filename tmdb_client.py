@@ -1,7 +1,18 @@
 import requests
-
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import time
 
 session = requests.Session()
+retry = Retry(
+    total=5,
+    backoff_factor=1.5,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["GET"]
+)
+
+adapter = HTTPAdapter(max_retries=retry)
+session.mount("https://", adapter)
 CAST_CACHE = {}
 DIRECTOR_CACHE = {}
 
@@ -9,19 +20,24 @@ API_KEY = "47972814d2bdf0a22af797337fe5f25f"
 BASE_URL = "https://api.themoviedb.org/3"
 
 def search_movies_tmdb(query, page=1):
-    response = session.get(
-        f"{BASE_URL}/search/movie",
-        params={
-            "api_key": API_KEY,
-            "query": query
-        },
-        timeout=10
-    )
+    try:
+        response = session.get(
+            f"{BASE_URL}/search/movie",
+            params={
+                "api_key": API_KEY,
+                "query": query
+            },
+            timeout=10
+        )
 
-    if response.status_code != 200:
+        time.sleep(0.3)  # To avoid hitting rate limits too quickly
+        if response.status_code != 200:
+            return []
+
+        return response.json().get("results", [])
+    except requests.exceptions.RequestException:
+        # Network / SSL / connection reset → fail gracefully
         return []
-
-    return response.json().get("results", [])
 
 def get_cast_and_director(movie_id):
     if not movie_id:
