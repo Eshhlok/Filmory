@@ -8,8 +8,9 @@ cosine_sim = None
 
 def build_text_similarity(movies_df):
     global tfidf_matrix, cosine_sim
-    tfidf_matrix = tfidf.fit_transform(movies_df["overview"])
+    tfidf_matrix = tfidf.fit_transform(movies_df["overview"].fillna(""))
     cosine_sim = cosine_similarity(tfidf_matrix)
+    return tfidf, cosine_sim
 
 
 def get_story_similarities(seed_index):
