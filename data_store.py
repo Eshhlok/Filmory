@@ -1,11 +1,13 @@
 # data_store.py
-
+import sys
 import time
+import os
 import requests
 import pandas as pd
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from config import *
+import ast
 
 session = requests.Session()
 retry = Retry(
@@ -18,7 +20,9 @@ retry = Retry(
 adapter = HTTPAdapter(max_retries=retry)
 session.mount("https://", adapter)
 
-def fetch_movies(language_code, pages=PAGES_PER_LANGUAGE):
+
+
+def fetch_movies(language_code, genre_id,pages=PAGES_PER_LANGUAGE):
     movies = []
 
     for page in range(1, pages + 1):
@@ -28,12 +32,17 @@ def fetch_movies(language_code, pages=PAGES_PER_LANGUAGE):
                 params={
                     "api_key": API_KEY,
                     "language": language_code,
-                    "sort_by": "popularity.desc",
+                    "with_original_language": language_code.split("-")[0],
+                    "with_genres": genre_id,
+                    "sort_by": "vote_count.desc",
                     "page": page
                 },
                 timeout=REQUEST_TIMEOUT
             )
-
+            if response.status_code == 429:
+                print("Rate limited. Sleeping 5 seconds...")
+                time.sleep(5)
+                continue
             if response.status_code != 200:
                 print(f"⚠️ Failed {language_code} page {page}")
                 break
@@ -63,16 +72,50 @@ def fetch_movies(language_code, pages=PAGES_PER_LANGUAGE):
 
     return movies
 
-
-def load_movies():
+CACHE_FILE = "movies_cache.csv"
+def load_movies(force_refresh=False):
     all_movies = []
+    if os.path.exists(CACHE_FILE) and not force_refresh:
+        print("Loading movies from local cache...")
+        df = pd.read_csv(CACHE_FILE)
+        required_columns = {"id", "title", "overview", "genre_ids"}
+        if required_columns.issubset(df.columns):
+            if "genre_ids" in df.columns:
+                df["genre_ids"] = df["genre_ids"].apply(
+                    lambda x: ast.literal_eval(x) if isinstance(x, str) else x
+                )
+            print(f"Loaded {len(df)} movies from cache.")
+            return df
+        else:
+            print("⚠️ Cache schema outdated. Rebuilding dataset...")
+    
+    print("Fetching movies from TMDB...")
 
-    for _, lang_code in LANGUAGES.items():
-        all_movies.extend(fetch_movies(lang_code))
+    total_tasks = len(LANGUAGES) * len(GENRE_MAP)
+    current_task = 0
 
-    df = pd.DataFrame(all_movies)
+    for lang_name, lang_code in LANGUAGES.items():
+        for genre_name, genre_id in GENRE_MAP.items():
+            current_task += 1
+
+            print(
+                f"[{current_task}/{total_tasks}] "
+                f"{lang_name} - {genre_name}",
+                flush=True
+            )
+
+            movies = fetch_movies(lang_code, genre_id, pages=PAGES_PER_LANGUAGE)
+            print(f"   → Fetched {len(movies)} movies")
+
+            all_movies.extend(movies)
+
+
+
+    movies_df = pd.DataFrame(all_movies)
 
     # IMPORTANT: stable index
-    df = df.dropna(subset=["title"]).reset_index(drop=True)
+    movies_df.drop_duplicates(subset=["id"], inplace=True)
+    movies_df.to_csv(CACHE_FILE, index=False)
 
-    return df
+    print("Saved dataset to cache.")
+    return movies_df

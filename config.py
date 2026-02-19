@@ -3,7 +3,7 @@ BASE_URL = "https://api.themoviedb.org/3"
 IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 
 REQUEST_TIMEOUT = 10
-REQUEST_SLEEP = 0.6
+REQUEST_SLEEP = 0.3
 
 LANGUAGES = {
     "English": "en-US",
