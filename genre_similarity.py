@@ -5,7 +5,7 @@ def get_genre_similarities(
     language_filter=None,
     top_n=30
 ):
-    seed_genres = set(seed_movie.get("genres", []))
+    seed_genres = set(seed_movie.get("genre_ids", []))
 
     if not seed_genres:
         return []
@@ -20,7 +20,7 @@ def get_genre_similarities(
         if language_filter and row["language"] != language_filter:
             continue
 
-        row_genres = set(row.get("genres", []))
+        row_genres = set(row.get("genre_ids", []))
         shared_genres = seed_genres & row_genres
 
         if shared_genres:
@@ -29,9 +29,6 @@ def get_genre_similarities(
                 "score": len(shared_genres)
             })
 
-    # sort by:
-    # 1️⃣ shared genre count
-    # 2️⃣ rating
     results.sort(
         key=lambda x: (
             x["score"],
@@ -55,7 +52,7 @@ def get_genre_similarities(
             "rating": row["rating"],
             "release_date": row["release_date"],
             "language": row["language"],
-            "genres": row.get("genres", [])
+            "genre_ids": row.get("genre_ids", [])
         })
 
         if len(recommendations) >= top_n:

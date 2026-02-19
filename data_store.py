@@ -2,6 +2,7 @@
 import sys
 import time
 import os
+from urllib import response
 import requests
 import pandas as pd
 from requests.adapters import HTTPAdapter
@@ -22,35 +23,49 @@ session.mount("https://", adapter)
 
 
 
-def fetch_movies(language_code, genre_id,pages=PAGES_PER_LANGUAGE):
+def fetch_movies(language_code, genre_id, pages=PAGES_PER_LANGUAGE):
     movies = []
 
     for page in range(1, pages + 1):
         try:
+            base_lang = language_code.split("-")[0]
             response = session.get(
                 f"{BASE_URL}/discover/movie",
                 params={
                     "api_key": API_KEY,
-                    "language": language_code,
-                    "with_original_language": language_code.split("-")[0],
+                    "language": base_lang,
                     "with_genres": genre_id,
                     "sort_by": "vote_count.desc",
                     "page": page
                 },
                 timeout=REQUEST_TIMEOUT
             )
+            #print("STATUS:", response.status_code)
+            #print("URL:", response.url)
+            #print("RAW:", response.text[:200])
+
+
             if response.status_code == 429:
                 print("Rate limited. Sleeping 5 seconds...")
                 time.sleep(5)
                 continue
+
             if response.status_code != 200:
                 print(f"⚠️ Failed {language_code} page {page}")
                 break
 
             data = response.json()
-            if "results" not in data:
+            results = data.get("results", [])
+
+            print(
+                f"{language_code} | Genre {genre_id} | Page {page} "
+                f"→ {len(results)} movies"
+            )
+
+            if not results:
                 break
-            for m in data.get("results", []):
+
+            for m in results:
                 movies.append({
                     "id": m.get("id"),
                     "title": m.get("title"),
@@ -66,11 +81,13 @@ def fetch_movies(language_code, genre_id,pages=PAGES_PER_LANGUAGE):
                 })
 
             time.sleep(REQUEST_SLEEP)
+
         except Exception as e:
             print(f"❌ Error fetching {language_code} page {page}: {e}")
             break
 
     return movies
+
 
 CACHE_FILE = "movies_cache.csv"
 def load_movies(force_refresh=False):
@@ -95,7 +112,7 @@ def load_movies(force_refresh=False):
     current_task = 0
 
     for lang_name, lang_code in LANGUAGES.items():
-        for genre_name, genre_id in GENRE_MAP.items():
+        for genre_id, genre_name in GENRE_MAP.items():
             current_task += 1
 
             print(
@@ -112,10 +129,14 @@ def load_movies(force_refresh=False):
 
 
     movies_df = pd.DataFrame(all_movies)
+    if movies_df.empty:
+        raise RuntimeError("❌ No movies fetched. Aborting cache save.")
 
     # IMPORTANT: stable index
     movies_df.drop_duplicates(subset=["id"], inplace=True)
     movies_df.to_csv(CACHE_FILE, index=False)
+    print("Columns:", movies_df.columns)
+    print("Total movies:", len(movies_df))
 
     print("Saved dataset to cache.")
     return movies_df

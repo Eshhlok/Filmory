@@ -253,7 +253,7 @@ if "selected_movie" in st.session_state:
                 if rec_mode == "genre":
                     genre_names = [
                         GENRE_MAP.get(gid, str(gid))
-                        for gid in movie.get("genres", [])
+                        for gid in movie.get("genre_ids", [])
                     ]
                     st.write("🎭 Genres:", ", ".join(genre_names))
         # LOAD MORE RECOMMENDATIONS (CENTERED)
