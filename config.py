@@ -1,4 +1,7 @@
-API_KEY = "47972814d2bdf0a22af797337fe5f25f"
+import os
+from dotenv import load_dotenv
+load_dotenv()
+API_KEY = os.getenv("TMDB_API_KEY")
 BASE_URL = "https://api.themoviedb.org/3"
 IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500"
 
