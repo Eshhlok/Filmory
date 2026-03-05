@@ -1,15 +1,47 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-tfidf = TfidfVectorizer(stop_words="english", max_features=5000)
-tfidf_matrix = None
-cosine_sim = None
+def build_features(movies_df):
+
+    def build_row_features(row):
+
+        overview = (row.get("overview") or "") * 3
+
+        genre_text = " ".join(
+            str(g) for g in row.get("genre_ids", [])
+        )
+        genre_text = (genre_text + " ") * 2
+
+        language = row.get("language", "")
+
+        combined = f"{overview} {genre_text} {language}"
+
+        return combined
+
+    movies_df["combined_features"] = movies_df.apply(
+        build_row_features,
+        axis=1
+    )
+
+    return movies_df
+
+
 
 
 def build_text_similarity(movies_df):
-    global tfidf_matrix, cosine_sim
-    tfidf_matrix = tfidf.fit_transform(movies_df["overview"].fillna(""))
+
+    tfidf = TfidfVectorizer(
+        stop_words="english",
+        max_features=10000
+    )
+
+    tfidf_matrix = tfidf.fit_transform(
+        movies_df["combined_features"]
+    )
+
+    global cosine_sim
     cosine_sim = cosine_similarity(tfidf_matrix)
+
     return tfidf, cosine_sim
 
 
