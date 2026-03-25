@@ -1,8 +1,8 @@
-from text_similarity import get_story_recommendations, build_text_similarity, build_features
-from people_similarity import get_people_recommendations
+import pandas as pd
+from text_similarity import get_story_recommendations
+from people_similarity import get_people_recommendations, _find_seed_movie
 from genre_similarity import get_genre_similarities
 from tmdb_client import search_movies_tmdb
-import pandas as pd
 
 
 def _get_tmdb_metadata(movie_title: str) -> dict | None:
@@ -14,7 +14,6 @@ def _get_tmdb_metadata(movie_title: str) -> dict | None:
     if not results:
         return None
 
-    # Pick the best match — exact title match preferred
     movie_title_lower = movie_title.lower().strip()
     for r in results:
         if r.get("title", "").lower().strip() == movie_title_lower:
@@ -24,7 +23,6 @@ def _get_tmdb_metadata(movie_title: str) -> dict | None:
                 "language":  r.get("original_language", "")
             }
 
-    # Fall back to first result
     r = results[0]
     return {
         "genre_ids": r.get("genre_ids", []),
@@ -40,14 +38,8 @@ def _fallback_recommend(
     top_n: int = 30
 ) -> list[dict]:
     """
-    Called when the movie is not found in local DB.
-
-    Strategy:
-      1. Fetch genre + plot from TMDB
-      2. Score all DB movies by:
-           - Genre overlap (weighted 2x)
-           - TF-IDF cosine similarity against the TMDB overview (weighted 1x)
-      3. Return same-language results first, then others, sorted by score
+    Called only when the movie truly cannot be found in DB at all.
+    Uses TMDB genre + plot to find similar movies, same language first.
     """
     print(f"⚠️  '{movie_title}' not found in DB. Fetching metadata from TMDB for fallback...")
     metadata = _get_tmdb_metadata(movie_title)
@@ -68,7 +60,7 @@ def _fallback_recommend(
         row_genres = set(row.get("genre_ids", []))
         shared = seed_genres & row_genres
         if shared:
-            genre_scores[idx] = len(shared) * 2   # weight 2x
+            genre_scores[idx] = len(shared) * 2
 
     # ── Story / TF-IDF scores ─────────────────────────────────────────
     story_scores: dict[int, float] = {}
@@ -80,31 +72,29 @@ def _fallback_recommend(
         tfidf  = TfidfVectorizer(stop_words="english", max_features=10000)
         matrix = tfidf.fit_transform(corpus)
 
-        seed_vec  = matrix[-1]                      # last row = seed overview
+        seed_vec  = matrix[-1]
         db_matrix = matrix[:-1]
         sims      = cosine_similarity(seed_vec, db_matrix).flatten()
 
         for idx, score in enumerate(sims):
-            if score > 0.01:                         # ignore noise
-                story_scores[idx] = float(score)    # weight 1x
+            if score > 0.01:
+                story_scores[idx] = float(score)
 
     # ── Combine scores ────────────────────────────────────────────────
     all_indices = set(genre_scores) | set(story_scores)
-    combined: list[tuple[int, float]] = []
-
-    for idx in all_indices:
-        total = genre_scores.get(idx, 0) + story_scores.get(idx, 0)
-        combined.append((idx, total))
-
+    combined: list[tuple[int, float]] = [
+        (idx, genre_scores.get(idx, 0) + story_scores.get(idx, 0))
+        for idx in all_indices
+    ]
     combined.sort(key=lambda x: x[1], reverse=True)
 
-    # ── Build results: same language first, then others ───────────────
-    same_lang   = []
-    other_lang  = []
+    # ── Same language first, then others ─────────────────────────────
+    same_lang  = []
+    other_lang = []
     seen_titles = set()
 
     for idx, score in combined:
-        row = movies_df.iloc[idx]
+        row   = movies_df.iloc[idx]
         title = row["title"]
 
         if title in seen_titles:
@@ -129,8 +119,7 @@ def _fallback_recommend(
         if len(same_lang) + len(other_lang) >= top_n * 2:
             break
 
-    results = same_lang + other_lang
-    return results[:top_n]
+    return (same_lang + other_lang)[:top_n]
 
 
 def recommend(
@@ -145,37 +134,31 @@ def recommend(
     Main recommendation entry point.
 
     Flow:
-      1. Try to find the movie in the local DB
-      2. If found → use the requested mode (story / cast / director / genre)
-      3. If NOT found → fallback using TMDB metadata (genre + plot),
-         same language first then others
+      1. Use _find_seed_movie() — smart 4-step lookup that handles
+         regional titles like दंगल when user types 'dangal'
+      2. If found → route to correct mode
+      3. If NOT found → generic TMDB metadata fallback
     """
-    titles      = movies_df["title"].str.lower()
-    title_lower = movie_title.lower().strip()
 
-    # ── Check if movie exists in DB ───────────────────────────────────
-    matches = movies_df[titles == title_lower]
-    if matches.empty:
-        matches = movies_df[titles.str.contains(title_lower, regex=False)]
+    # ── Smart lookup — handles English input for regional titles ──────
+    seed_idx, seed_movie = _find_seed_movie(movies_df, movie_title)
 
-    # ── Movie NOT in DB → fallback ────────────────────────────────────
-    if matches.empty:
+    # ── Movie NOT in DB → generic fallback ───────────────────────────
+    if seed_idx is None:
         results = _fallback_recommend(movies_df, cosine_sim, movie_title, top_n)
-
-        # Apply language filter on top of fallback if user selected one
         if language_filter:
             results = [r for r in results if r["language"] == language_filter]
-
         return results
 
-    # ── Movie found in DB → normal recommendation ─────────────────────
-    seed_movie = matches.iloc[0]
+    # ── Movie found → route to correct mode ──────────────────────────
+    # Use the actual DB title (e.g. "दंगल") for downstream lookups
+    db_title = seed_movie["title"]
 
     if mode == "story":
         return get_story_recommendations(
             movies_df,
             cosine_sim,
-            movie_title,
+            db_title,        # ✅ use DB title, not user input
             top_n,
             language_filter
         )
@@ -183,7 +166,7 @@ def recommend(
     elif mode in ("cast", "director"):
         return get_people_recommendations(
             movies_df,
-            movie_title,
+            db_title,        # ✅ use DB title, not user input
             top_n,
             language_filter,
             mode
