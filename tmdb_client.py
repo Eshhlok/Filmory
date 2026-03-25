@@ -12,62 +12,61 @@ retry = Retry(
     status_forcelist=[429, 500, 502, 503, 504],
     allowed_methods=["GET"]
 )
-
 adapter = HTTPAdapter(max_retries=retry)
 session.mount("https://", adapter)
-CAST_CACHE = {}
-DIRECTOR_CACHE = {}
 
 
 def search_movies_tmdb(query, page=1):
     try:
         response = session.get(
             f"{BASE_URL}/search/movie",
-            params={
-                "api_key": API_KEY,
-                "query": query
-            },
+            params={"api_key": API_KEY, "query": query},
             timeout=10
         )
-
-        time.sleep(0.3)  # To avoid hitting rate limits too quickly
+        time.sleep(0.3)
         if response.status_code != 200:
             return []
-
         return response.json().get("results", [])
     except requests.exceptions.RequestException:
-        # Network / SSL / connection reset → fail gracefully
         return []
 
-@lru_cache(maxsize=1024)
+
+@lru_cache(maxsize=4096)
 def get_cast_and_director(movie_id):
+    """
+    Returns (cast_list, director_list) for a movie.
+    cast_list is sorted by TMDB's official billing order field.
+    So index 0 is always the top billed actor.
+    """
     if not movie_id:
         return [], []
 
-    if movie_id in CAST_CACHE:
-        return CAST_CACHE[movie_id], DIRECTOR_CACHE[movie_id]
-    
-    response = session.get(
-        f"{BASE_URL}/movie/{movie_id}/credits",
-        params={"api_key": API_KEY},
-        timeout=10
-    )
+    try:
+        response = session.get(
+            f"{BASE_URL}/movie/{movie_id}/credits",
+            params={"api_key": API_KEY},
+            timeout=10
+        )
+        time.sleep(0.1)
 
-    if response.status_code != 200:
-        CAST_CACHE[movie_id] = []
-        DIRECTOR_CACHE[movie_id] = []
+        if response.status_code != 200:
+            return [], []
+
+        data = response.json()
+
+        # ✅ Sort by TMDB's 'order' field — official billing order
+        cast_sorted = sorted(
+            data.get("cast", []),
+            key=lambda x: x.get("order", 9999)
+        )
+        cast = [c["name"] for c in cast_sorted[:10]]
+
+        director = [
+            c["name"] for c in data.get("crew", [])
+            if c.get("job") == "Director"
+        ]
+
+        return cast, director
+
+    except Exception:
         return [], []
-
-    data = response.json()
-
-    cast = [c["name"] for c in data.get("cast", [])[:10]]
-    director = [
-        c["name"] for c in data.get("crew", [])
-        if c.get("job") == "Director"
-    ]
-
-    CAST_CACHE[movie_id] = cast
-    DIRECTOR_CACHE[movie_id] = director
-
-    return cast, director
-
