@@ -90,7 +90,7 @@ def fetch_movies(language_code, genre_id, pages=PAGES_PER_LANGUAGE):
 
 
 CACHE_FILE = "movies_cache.csv"
-def load_movies(force_refresh=False):
+def load_movies(force_refresh=True):
     all_movies = []
     if os.path.exists(CACHE_FILE) and not force_refresh:
         print("Loading movies from local cache...")

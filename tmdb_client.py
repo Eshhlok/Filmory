@@ -3,6 +3,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import time
 from functools import lru_cache
+from config import API_KEY, BASE_URL
 
 session = requests.Session()
 retry = Retry(
@@ -17,8 +18,6 @@ session.mount("https://", adapter)
 CAST_CACHE = {}
 DIRECTOR_CACHE = {}
 
-API_KEY = "47972814d2bdf0a22af797337fe5f25f"
-BASE_URL = "https://api.themoviedb.org/3"
 
 def search_movies_tmdb(query, page=1):
     try:
