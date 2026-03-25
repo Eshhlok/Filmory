@@ -1,5 +1,7 @@
 from data_store import load_movies
 from text_similarity import build_text_similarity,build_features
+from data_store import fetch_all_movies, load_movies
+fetch_all_movies(incremental=True)  # only runs new fetches
 movies_df = load_movies()
 movies_df.reset_index(drop=True, inplace=True)
 movies_df = build_features(movies_df)  
