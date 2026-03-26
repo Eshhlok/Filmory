@@ -5,6 +5,7 @@ import Image from "next/image"
 import { X, Star, Calendar, Globe, Users, Clapperboard } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Movie, RecommendationType } from "@/lib/types"
+import { useInView } from "@/hooks/useInView"
 
 interface MovieDetailProps {
   movie: Movie
@@ -20,6 +21,8 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
     ? new Date(movie.release_date).getFullYear()
     : "N/A"
 
+  const { ref, isVisible } = useInView()
+
   useEffect(() => {
     document.body.style.overflow = "hidden"
     return () => {
@@ -29,12 +32,15 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_.8s_ease-out]"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_.25s_ease-out]"
         onClick={onClose}
       />
 
-      <div className="relative bg-stone-50 rounded-2xl max-w-3xl w-full h-[85vh] flex flex-col shadow-2xl animate-[modalIn_.53s_cubic-bezier(.22,.61,.36,1)]">
+      {/* Modal */}
+      <div className="relative bg-stone-50 rounded-2xl max-w-3xl w-full h-[85vh] flex flex-col shadow-2xl animate-[modalIn_.28s_cubic-bezier(.22,.61,.36,1)]">
 
         {/* Backdrop */}
         <div className="relative h-48 sm:h-64 shrink-0">
@@ -80,7 +86,7 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
               )}
             </div>
 
-            {/* Info */}
+            {/* Title */}
             <div className="flex-1 pt-16 sm:pt-20">
               <h2 className="font-serif text-2xl sm:text-3xl text-stone-800">
                 {movie.title}
@@ -108,32 +114,41 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
           </div>
         </div>
 
-        {/* Scrollable Content */}
+        {/* Scroll container */}
         <div className="mt-6 px-6 pb-6 overflow-y-auto flex-1">
 
-          {/* Overview */}
-          <p className="text-stone-600 leading-relaxed">
-            {movie.overview || "No overview available."}
-          </p>
+          {/* Animated content (scroll triggered) */}
+          <div
+            ref={ref}
+            className={`transition-opacity duration-300 ${
+              isVisible ? "filmory-stagger opacity-100" : "opacity-0"
+            }`}
+          >
 
-          {/* Genres */}
-          {genres.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {genres.map((genre) => (
-                <span
-                  key={genre}
-                  className="px-3 py-1 bg-stone-200 text-stone-700 text-sm rounded-full"
-                >
-                  {genre}
-                </span>
-              ))}
+            {/* Overview */}
+            <div>
+              <p className="text-stone-600 leading-relaxed">
+                {movie.overview || "No overview available."}
+              </p>
             </div>
-          )}
 
-          {/* Credits */}
-          <div className="mt-5 space-y-3">
+            {/* Genres */}
+            {genres.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {genres.map((genre) => (
+                  <span
+                    key={genre}
+                    className="px-3 py-1 bg-stone-200 text-stone-700 text-sm rounded-full"
+                  >
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Director */}
             {director && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="mt-5 flex items-center gap-2 text-sm">
                 <Clapperboard className="w-4 h-4 text-stone-400" />
                 <span className="text-stone-500">Director:</span>
                 <span className="text-stone-700 font-medium">
@@ -142,6 +157,7 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
               </div>
             )}
 
+            {/* Cast */}
             {topCast.length > 0 && (
               <div className="flex items-start gap-2 text-sm">
                 <Users className="w-4 h-4 text-stone-400 mt-0.5" />
@@ -151,51 +167,39 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
                 </span>
               </div>
             )}
-          </div>
 
-          {/* Recommendation buttons */}
-          <div className="mt-6 pt-5 border-t border-stone-200">
-            <p className="text-sm text-stone-500 mb-3">
-              Find similar movies by:
-            </p>
+            {/* Buttons */}
+            <div className="mt-6 pt-5 border-t border-stone-200">
+              <p className="text-sm text-stone-500 mb-3">
+                Find similar movies by:
+              </p>
 
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={() => onRecommend(movie, "story")}
-                variant="outline"
-              >
-                Story / Plot
-              </Button>
-
-              {topCast.length > 0 && (
-                <Button
-                  onClick={() => onRecommend(movie, "cast")}
-                  variant="outline"
-                >
-                  Cast
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => onRecommend(movie, "story")} variant="outline">
+                  Story / Plot
                 </Button>
-              )}
 
-              {director && (
-                <Button
-                  onClick={() => onRecommend(movie, "director")}
-                  variant="outline"
-                >
-                  Director
-                </Button>
-              )}
+                {topCast.length > 0 && (
+                  <Button onClick={() => onRecommend(movie, "cast")} variant="outline">
+                    Cast
+                  </Button>
+                )}
 
-              {genres.length > 0 && (
-                <Button
-                  onClick={() => onRecommend(movie, "genre")}
-                  variant="outline"
-                >
-                  Genre
-                </Button>
-              )}
+                {director && (
+                  <Button onClick={() => onRecommend(movie, "director")} variant="outline">
+                    Director
+                  </Button>
+                )}
+
+                {genres.length > 0 && (
+                  <Button onClick={() => onRecommend(movie, "genre")} variant="outline">
+                    Genre
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
 
+          </div>
         </div>
       </div>
     </div>
