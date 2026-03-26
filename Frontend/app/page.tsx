@@ -7,22 +7,14 @@ import { MovieDetail } from "@/components/movie-detail"
 import { LoadingScreen } from "@/components/loading-screen"
 import { Spinner } from "@/components/ui/spinner"
 import type { Movie, RecommendationType } from "@/lib/types"
-import { 
-  MOVIES, 
-  LANGUAGES, 
-  searchMovies,  
-  getSimilarMovies, 
-  getMoviesByDirector, 
-  getMoviesByCast,
-  getMoviesByGenreFromMovie,
-  getCredits 
-} from "@/lib/mock-data"
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 const RECOMMENDATION_MODES = [
-  { id: "story" as RecommendationType, label: "Story / Plot", icon: BookOpen, description: "Similar themes and narratives" },
-  { id: "cast" as RecommendationType, label: "Cast", icon: Users, description: "Same actors" },
-  { id: "director" as RecommendationType, label: "Director", icon: Clapperboard, description: "Same filmmaker" },
-  { id: "genre" as RecommendationType, label: "Genre", icon: Layers, description: "Same category" },
+  { id: "story"    as RecommendationType, label: "Story / Plot", icon: BookOpen,     description: "Similar themes and narratives" },
+  { id: "cast"     as RecommendationType, label: "Cast",         icon: Users,        description: "Same actors" },
+  { id: "director" as RecommendationType, label: "Director",     icon: Clapperboard, description: "Same filmmaker" },
+  { id: "genre"    as RecommendationType, label: "Genre",        icon: Layers,       description: "Same category" },
 ]
 
 const LOADING_MESSAGES = [
@@ -32,39 +24,64 @@ const LOADING_MESSAGES = [
   "Curating your recommendations...",
 ]
 
-export default function Home() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false)
-  const [loadingMessage, setLoadingMessage] = useState(LOADING_MESSAGES[0])
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedLanguage, setSelectedLanguage] = useState("")
-  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null)
-  const [selectedMode, setSelectedMode] = useState<RecommendationType>("story")
-  const [sourceMovie, setSourceMovie] = useState<Movie | null>(null)
-  const [recommendations, setRecommendations] = useState<Movie[]>([])
-  const [isFallbackResults, setIsFallbackResults] = useState(false)
-  const [personInfo, setPersonInfo] = useState<{ id: number; name: string } | null>(null)
-  const [searchResults, setSearchResults] = useState<Movie[]>([])
+async function apiSearch(query: string, page = 1): Promise<Movie[]> {
+  const res = await fetch(`${API_BASE}/search?query=${encodeURIComponent(query)}&page=${page}`)
+  if (!res.ok) return []
+  return res.json()
+}
 
-  // Simulate initial loading (data fetching from DB)
+async function apiRecommend(
+  title: string,
+  mode: RecommendationType,
+  language: string,
+  topN = 30
+): Promise<{ is_fallback: boolean; results: Movie[] }> {
+  const params = new URLSearchParams({
+    title,
+    mode,
+    top_n: String(topN),
+    ...(language ? { language } : {})
+  })
+  const res = await fetch(`${API_BASE}/recommend?${params}`)
+  if (!res.ok) return { is_fallback: false, results: [] }
+  return res.json()
+}
+
+async function apiLanguages(): Promise<{ code: string; name: string }[]> {
+  const res = await fetch(`${API_BASE}/languages`)
+  if (!res.ok) return []
+  return res.json()
+}
+
+export default function Home() {
+  const [isLoading, setIsLoading]                               = useState(true)
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false)
+  const [loadingMessage, setLoadingMessage]                     = useState(LOADING_MESSAGES[0])
+  const [searchQuery, setSearchQuery]                           = useState("")
+  const [selectedLanguage, setSelectedLanguage]                 = useState("")
+  const [selectedMovie, setSelectedMovie]                       = useState<Movie | null>(null)
+  const [selectedMode, setSelectedMode]                         = useState<RecommendationType>("story")
+  const [sourceMovie, setSourceMovie]                           = useState<Movie | null>(null)
+  const [recommendations, setRecommendations]                   = useState<Movie[]>([])
+  const [isFallbackResults, setIsFallbackResults]               = useState(false)
+  const [searchResults, setSearchResults]                       = useState<Movie[]>([])
+  const [languages, setLanguages]                               = useState<{ code: string; name: string }[]>([])
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 2500)
-    return () => clearTimeout(timer)
+    apiLanguages()
+      .then(setLanguages)
+      .finally(() => setIsLoading(false))
   }, [])
 
-  // Update search results when query changes
   useEffect(() => {
-    if (searchQuery.trim()) {
-      const results = searchMovies(searchQuery, selectedLanguage || undefined)
+    if (!searchQuery.trim()) { setSearchResults([]); return }
+    const debounce = setTimeout(async () => {
+      const results = await apiSearch(searchQuery)
       setSearchResults(results)
-    } else {
-      setSearchResults([])
-    }
-  }, [searchQuery, selectedLanguage])
+    }, 300)
+    return () => clearTimeout(debounce)
+  }, [searchQuery])
 
-  // Cycle through loading messages
   useEffect(() => {
     if (!isLoadingRecommendations) return
     let index = 0
@@ -75,57 +92,15 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [isLoadingRecommendations])
 
-  // Get recommendations when source movie and mode are selected
   const getRecommendations = async (movie: Movie, mode: RecommendationType) => {
     setIsLoadingRecommendations(true)
     setLoadingMessage(LOADING_MESSAGES[0])
     setIsFallbackResults(false)
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000))
-
-    const credits = getCredits(movie.id)
-    const director = credits?.crew?.find(c => c.job === "Director")
-    const topCast = credits?.cast?.[0]
-
-    let results: Movie[] = []
-    let isFallback = false
-
-    switch (mode) {
-      case "story":
-        results = getSimilarMovies(movie, selectedLanguage || undefined)
-        setPersonInfo(null)
-        break
-      case "director":
-        if (director) {
-          results = getMoviesByDirector(director.id, movie.id, selectedLanguage || undefined)
-          setPersonInfo({ id: director.id, name: director.name })
-        }
-        break
-      case "cast":
-        if (topCast) {
-          results = getMoviesByCast(topCast.id, movie.id, selectedLanguage || undefined)
-          setPersonInfo({ id: topCast.id, name: topCast.name })
-        }
-        break
-      case "genre":
-        results = getMoviesByGenreFromMovie(movie, selectedLanguage || undefined)
-        setPersonInfo(null)
-        break
-    }
-
-    // Check if movie wasn't in our main database - simulate fallback
-    const isInDatabase = MOVIES.some(m => m.id === movie.id)
-    if (!isInDatabase || results.length === 0) {
-      // Provide fallback results - just grab some movies
-      if (results.length === 0) {
-        results = MOVIES.slice(0, 8)
-        isFallback = true
-      }
-    }
+    const { is_fallback, results } = await apiRecommend(movie.title, mode, selectedLanguage)
 
     setRecommendations(results)
-    setIsFallbackResults(isFallback)
+    setIsFallbackResults(is_fallback)
     setIsLoadingRecommendations(false)
   }
 
@@ -138,16 +113,12 @@ export default function Home() {
 
   const handleModeChange = (mode: RecommendationType) => {
     setSelectedMode(mode)
-    if (sourceMovie) {
-      getRecommendations(sourceMovie, mode)
-    }
+    if (sourceMovie) getRecommendations(sourceMovie, mode)
   }
 
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang)
-    if (sourceMovie) {
-      getRecommendations(sourceMovie, selectedMode)
-    }
+    if (sourceMovie) getRecommendations(sourceMovie, selectedMode)
   }
 
   const clearAll = () => {
@@ -155,27 +126,20 @@ export default function Home() {
     setRecommendations([])
     setSearchQuery("")
     setSearchResults([])
-    setPersonInfo(null)
     setIsFallbackResults(false)
   }
 
   const getRecommendationLabel = () => {
     if (!sourceMovie) return ""
     switch (selectedMode) {
-      case "story":
-        return `Movies similar to "${sourceMovie.title}"`
-      case "cast":
-        return personInfo ? `Movies starring ${personInfo.name}` : `Movies with same cast as "${sourceMovie.title}"`
-      case "director":
-        return personInfo ? `Movies directed by ${personInfo.name}` : `Movies by same director as "${sourceMovie.title}"`
-      case "genre":
-        return `Movies in the same genre as "${sourceMovie.title}"`
+      case "story":    return `Movies similar to "${sourceMovie.title}"`
+      case "cast":     return `Movies with same cast as "${sourceMovie.title}"`
+      case "director": return `Movies by same director as "${sourceMovie.title}"`
+      case "genre":    return `Movies in the same genre as "${sourceMovie.title}"`
     }
   }
 
-  if (isLoading) {
-    return <LoadingScreen />
-  }
+  if (isLoading) return <LoadingScreen />
 
   return (
     <div className="min-h-screen bg-stone-100">
@@ -192,7 +156,6 @@ export default function Home() {
               </span>
             </button>
 
-            {/* Language filter in header */}
             <select
               value={selectedLanguage}
               onChange={(e) => handleLanguageChange(e.target.value)}
@@ -200,9 +163,10 @@ export default function Home() {
               className="hidden sm:block px-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-700 focus:outline-none focus:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">All Languages</option>
-              {LANGUAGES.map(lang => (
-                <option key={lang.iso_639_1} value={lang.iso_639_1}>
-                  {lang.english_name}
+              {/* ✅ Fix 1: index fallback for language options */}
+              {languages.map((lang, i) => (
+                <option key={lang.code ?? `lang-${i}`} value={lang.code}>
+                  {lang.name}
                 </option>
               ))}
             </select>
@@ -211,7 +175,6 @@ export default function Home() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Hero / Search Section */}
         <div className="text-center mb-10">
           <h1 className="font-serif text-4xl sm:text-5xl text-stone-800 mb-3 text-balance">
             Find Your Next Favorite Film
@@ -241,7 +204,7 @@ export default function Home() {
               className="w-full pl-12 pr-4 py-4 bg-white border border-stone-300 rounded-2xl text-stone-800 text-lg placeholder:text-stone-400 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
             {searchQuery && !isLoadingRecommendations && (
-              <button 
+              <button
                 onClick={clearAll}
                 className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-stone-100 rounded-full transition-colors"
               >
@@ -253,15 +216,16 @@ export default function Home() {
           {/* Search Results Dropdown */}
           {searchResults.length > 0 && !sourceMovie && (
             <div className="mt-2 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden max-h-80 overflow-y-auto">
-              {searchResults.map(movie => (
+              {/* ✅ Fix 2: index fallback for search result buttons */}
+              {searchResults.map((movie, i) => (
                 <button
-                  key={movie.id}
+                  key={movie.id ?? `search-${i}`}
                   onClick={() => handleSelectSourceMovie(movie)}
                   className="w-full flex items-center gap-4 p-3 hover:bg-amber-50 transition-colors text-left border-b border-stone-100 last:border-b-0"
                 >
                   <div className="w-12 h-16 rounded bg-stone-200 overflow-hidden shrink-0">
                     {movie.poster_path && (
-                      <img 
+                      <img
                         src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`}
                         alt={movie.title}
                         className="w-full h-full object-cover"
@@ -272,7 +236,7 @@ export default function Home() {
                     <p className="font-medium text-stone-800 truncate">{movie.title}</p>
                     <p className="text-sm text-stone-500">
                       {movie.release_date ? new Date(movie.release_date).getFullYear() : "N/A"}
-                      {movie.vote_average > 0 && ` • ${movie.vote_average.toFixed(1)} rating`}
+                      {movie.vote_average > 0 && ` • ⭐ ${movie.vote_average.toFixed(1)}`}
                     </p>
                   </div>
                 </button>
@@ -289,9 +253,9 @@ export default function Home() {
               className="w-full px-3 py-2 bg-white border border-stone-300 rounded-lg text-sm text-stone-700 focus:outline-none focus:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">All Languages</option>
-              {LANGUAGES.map(lang => (
-                <option key={lang.iso_639_1} value={lang.iso_639_1}>
-                  {lang.english_name}
+              {languages.map((lang, i) => (
+                <option key={lang.code ?? `lang-mob-${i}`} value={lang.code}>
+                  {lang.name}
                 </option>
               ))}
             </select>
@@ -311,8 +275,8 @@ export default function Home() {
                   onClick={() => handleModeChange(mode.id)}
                   disabled={isLoadingRecommendations}
                   className={`p-4 rounded-xl border-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isActive 
-                      ? "border-amber-500 bg-amber-50" 
+                    isActive
+                      ? "border-amber-500 bg-amber-50"
                       : "border-stone-200 bg-white hover:border-amber-300 hover:bg-amber-50/50"
                   }`}
                 >
@@ -327,7 +291,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Loading State for Recommendations */}
+        {/* Loading */}
         {isLoadingRecommendations && (
           <div className="py-20 text-center">
             <div className="inline-flex flex-col items-center gap-4">
@@ -345,43 +309,38 @@ export default function Home() {
           </div>
         )}
 
-        {/* Results Section */}
+        {/* Results */}
         {sourceMovie && recommendations.length > 0 && !isLoadingRecommendations && (
           <>
-            {/* Fallback Notice */}
             {isFallbackResults && (
               <div className="mb-4 p-4 bg-stone-200/60 border border-stone-300 rounded-xl flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-stone-500 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-stone-700 font-medium text-sm">Limited match for this title</p>
                   <p className="text-stone-500 text-sm mt-0.5">
-                    We couldn&apos;t find an exact match for &quot;{sourceMovie.title}&quot; in our database. 
-                    The recommendations below are based on general popularity and may not be closely related to your selection.
+                    We couldn&apos;t find an exact match for &quot;{sourceMovie.title}&quot; in our database.
+                    Recommendations below are based on genre and plot similarity.
                   </p>
                 </div>
               </div>
             )}
 
-            {/* Recommendation banner */}
             <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Sparkles className="w-5 h-5 text-amber-600" />
                 <span className="text-amber-800 font-medium">{getRecommendationLabel()}</span>
               </div>
-              <button
-                onClick={clearAll}
-                className="p-1.5 hover:bg-amber-100 rounded-full transition-colors"
-              >
+              <button onClick={clearAll} className="p-1.5 hover:bg-amber-100 rounded-full transition-colors">
                 <X className="w-4 h-4 text-amber-700" />
               </button>
             </div>
 
-            {/* Movie grid */}
+            {/* ✅ Fix 3: index fallback for recommendation grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-              {recommendations.map((movie) => (
-                <MovieCard 
-                  key={movie.id} 
-                  movie={movie} 
+              {recommendations.map((movie, i) => (
+                <MovieCard
+                  key={movie.id ?? `rec-${i}`}
+                  movie={movie}
                   onClick={setSelectedMovie}
                 />
               ))}
@@ -389,7 +348,7 @@ export default function Home() {
           </>
         )}
 
-        {/* Empty state - when no source movie selected */}
+        {/* Empty state */}
         {!sourceMovie && !searchQuery && !isLoadingRecommendations && (
           <div className="text-center py-16">
             <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-stone-200 flex items-center justify-center">
@@ -402,7 +361,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* No results state */}
+        {/* No results */}
         {sourceMovie && recommendations.length === 0 && !isLoadingRecommendations && (
           <div className="text-center py-16">
             <Film className="w-16 h-16 text-stone-300 mx-auto mb-4" />
@@ -412,14 +371,12 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-stone-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 text-center text-stone-500 text-sm">
           <p>Built with love for film enthusiasts.</p>
         </div>
       </footer>
 
-      {/* Movie detail modal */}
       {selectedMovie && (
         <MovieDetail
           movie={selectedMovie}

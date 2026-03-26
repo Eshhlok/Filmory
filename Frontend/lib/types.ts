@@ -10,6 +10,14 @@ export interface Movie {
   original_language: string
   genre_ids?: number[]
   genres?: Genre[]
+  // ✅ Add these — populated by backend in cast/director mode
+  cast?: string[]
+  directors?: string[]
+  language?: string
+  language_name?: string
+  genre_names?: string[]
+  rating?: number
+  poster_url?: string
 }
 
 export interface Genre {
