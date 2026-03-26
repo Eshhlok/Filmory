@@ -18,7 +18,7 @@ export function MovieCard({ movie, onClick, showRank }: MovieCardProps) {
       onClick={() => onClick(movie)}
       className="group text-left w-full"
     >
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-stone-200 mb-3">
+      <div className="filmory-card relative aspect-[2/3] rounded-lg overflow-hidden bg-stone-200 mb-3">
         {showRank && (
           <div className="absolute top-2 left-2 z-10 w-8 h-8 rounded-full bg-amber-600 text-white font-serif text-lg flex items-center justify-center">
             {showRank}
@@ -29,7 +29,7 @@ export function MovieCard({ movie, onClick, showRank }: MovieCardProps) {
             src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
             alt={movie.title}
             fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.06]"
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
           />
         ) : (

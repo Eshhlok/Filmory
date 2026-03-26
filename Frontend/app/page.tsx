@@ -174,17 +174,26 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {!sourceMovie && (
-        <div className="text-center mb-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 transition-all duration-700">
+  
+        <div 
+          className={`grid transition-all duration-800 ${
+               sourceMovie
+                  ? "grid-rows-[0fr] opacity-0 mb-0"
+                  : "grid-rows-[1fr] opacity-100 mb-10"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="text-center">
           <h1 className="font-serif text-4xl sm:text-5xl text-stone-800 mb-3 text-balance">
             Find Your Next Favorite Film
           </h1>
           <p className="text-stone-500 text-lg max-w-xl mx-auto">
             Search for a movie you love, choose how you want to explore, and discover perfect recommendations.
           </p>
+            </div>
+          </div>
         </div>
-        )}
         {/* Search Input */}
         <div className="max-w-2xl mx-auto mb-8">
           <div className="relative">
