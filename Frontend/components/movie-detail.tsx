@@ -30,11 +30,11 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm animate-[fadeIn_.8s_ease-out]"
         onClick={onClose}
       />
 
-      <div className="relative bg-stone-50 rounded-2xl max-w-3xl w-full h-[85vh] flex flex-col shadow-2xl">
+      <div className="relative bg-stone-50 rounded-2xl max-w-3xl w-full h-[85vh] flex flex-col shadow-2xl animate-[modalIn_.53s_cubic-bezier(.22,.61,.36,1)]">
 
         {/* Backdrop */}
         <div className="relative h-48 sm:h-64 shrink-0">
