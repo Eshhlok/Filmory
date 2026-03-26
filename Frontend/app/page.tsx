@@ -214,12 +214,19 @@ export default function Home() {
             )}
           </div>
           {sourceMovie && (
-            <div className="flex justify-center mt-8 mb-10">
-              <div className="w-48 sm:w-56">
-                <MovieCard
-                  movie={sourceMovie}
-                  onClick={setSelectedMovie}
-                />
+            <div className="flex flex-col items-center mt-8 mb-12 animate-fade-in">
+    
+              <p className="text-stone-500 text-sm mb-3">
+                Selected Movie
+              </p>
+
+              <div className="p-2 rounded-2xl bg-gradient-to-b from-amber-100 to-transparent">
+                <div className="w-56 sm:w-64">
+                  <MovieCard
+                    movie={sourceMovie}
+                    onClick={setSelectedMovie}
+                  />
+                </div>
               </div>
             </div>
           )}
