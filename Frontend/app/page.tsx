@@ -174,16 +174,26 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="text-center mb-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 transition-all duration-700">
+  
+        <div 
+          className={`grid transition-all duration-800 ${
+               sourceMovie
+                  ? "grid-rows-[0fr] opacity-0 mb-0"
+                  : "grid-rows-[1fr] opacity-100 mb-10"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="text-center">
           <h1 className="font-serif text-4xl sm:text-5xl text-stone-800 mb-3 text-balance">
             Find Your Next Favorite Film
           </h1>
           <p className="text-stone-500 text-lg max-w-xl mx-auto">
             Search for a movie you love, choose how you want to explore, and discover perfect recommendations.
           </p>
+            </div>
+          </div>
         </div>
-
         {/* Search Input */}
         <div className="max-w-2xl mx-auto mb-8">
           <div className="relative">
@@ -212,7 +222,23 @@ export default function Home() {
               </button>
             )}
           </div>
+          {sourceMovie && (
+            <div className="flex flex-col items-center mt-8 mb-12 animate-fade-in">
+    
+              <p className="text-stone-500 text-sm mb-3">
+                Selected Movie
+              </p>
 
+              <div className="p-2 rounded-2xl bg-gradient-to-b from-amber-100 to-transparent">
+                <div className="w-56 sm:w-64">
+                  <MovieCard
+                    movie={sourceMovie}
+                    onClick={setSelectedMovie}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
           {/* Search Results Dropdown */}
           {searchResults.length > 0 && !sourceMovie && (
             <div className="mt-2 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden max-h-80 overflow-y-auto">
