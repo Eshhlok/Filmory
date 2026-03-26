@@ -43,12 +43,19 @@ def init_db():
             title        TEXT,
             overview     TEXT,
             poster_url   TEXT,
+            backdrop_url TEXT,
             rating       REAL,
             release_date TEXT,
             language     TEXT,
             genre_ids    TEXT
         )
     """)
+
+    # Add backdrop_url to existing DBs that predate this column
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(movies)").fetchall()]
+    if "backdrop_url" not in cols:
+        conn.execute("ALTER TABLE movies ADD COLUMN backdrop_url TEXT")
+        print("🔄 Migrated: added backdrop_url column to existing movies table.")
 
     # ✅ Credits table — persistent cast/director cache
     conn.execute("""
@@ -76,6 +83,7 @@ def save_movies(movies: list[dict]):
             "title":        m["title"],
             "overview":     m["overview"],
             "poster_url":   m["poster_url"],
+            "backdrop_url": m.get("backdrop_url"),
             "rating":       m["rating"],
             "release_date": m["release_date"],
             "language":     m["language"],
@@ -88,9 +96,9 @@ def save_movies(movies: list[dict]):
     conn.executemany(
         """
         INSERT OR IGNORE INTO movies
-            (id, title, overview, poster_url, rating, release_date, language, genre_ids)
+            (id, title, overview, poster_url, backdrop_url, rating, release_date, language, genre_ids)
         VALUES
-            (:id, :title, :overview, :poster_url, :rating, :release_date, :language, :genre_ids)
+            (:id, :title, :overview, :poster_url, :backdrop_url, :rating, :release_date, :language, :genre_ids)
         """,
         rows
     )
@@ -257,6 +265,10 @@ def fetch_movies(language_code: str, genre_id: int, pages: int) -> list[dict]:
                     "poster_url":   (
                         IMAGE_BASE_URL + m["poster_path"]
                         if m.get("poster_path") else None
+                    ),
+                    "backdrop_url": (
+                        "https://image.tmdb.org/t/p/w1280" + m["backdrop_path"]
+                        if m.get("backdrop_path") else None
                     ),
                     "rating":       m.get("vote_average"),
                     "release_date": m.get("release_date"),

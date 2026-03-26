@@ -7,7 +7,7 @@ const _serif = DM_Serif_Display({ subsets: ["latin"], weight: "400" });
 const _sans = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Filmory - Smart Movie Recommendations',
+  title: 'Filmory - Your Curated Cinema Catalogue',
   description: 'Discover your next favorite film with intelligent, personalized recommendations',
   generator: 'v0.app',
   icons: {
