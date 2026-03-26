@@ -175,6 +175,7 @@ export default function Home() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {!sourceMovie && (
         <div className="text-center mb-10">
           <h1 className="font-serif text-4xl sm:text-5xl text-stone-800 mb-3 text-balance">
             Find Your Next Favorite Film
@@ -183,7 +184,7 @@ export default function Home() {
             Search for a movie you love, choose how you want to explore, and discover perfect recommendations.
           </p>
         </div>
-
+        )}
         {/* Search Input */}
         <div className="max-w-2xl mx-auto mb-8">
           <div className="relative">
@@ -212,7 +213,16 @@ export default function Home() {
               </button>
             )}
           </div>
-
+          {sourceMovie && (
+            <div className="flex justify-center mt-8 mb-10">
+              <div className="w-48 sm:w-56">
+                <MovieCard
+                  movie={sourceMovie}
+                  onClick={setSelectedMovie}
+                />
+              </div>
+            </div>
+          )}
           {/* Search Results Dropdown */}
           {searchResults.length > 0 && !sourceMovie && (
             <div className="mt-2 bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden max-h-80 overflow-y-auto">
