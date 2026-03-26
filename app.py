@@ -4,6 +4,7 @@ from backend import movies_df, cosine_sim
 from tmdb_client import search_movies_tmdb
 from data_store import load_credits
 from config import GENRE_MAP
+from difflib import SequenceMatcher
 
 LANGUAGE_MAP = {
     "en": "English", "hi": "Hindi", "te": "Telugu", "ta": "Tamil",
@@ -40,6 +41,7 @@ def get_credits_cache():
 
 credits_cache = get_credits_cache()
 
+
 # ─────────────────────────────────────────────
 # Session state initialisation
 # ─────────────────────────────────────────────
@@ -64,38 +66,48 @@ for k, v in defaults.items():
 
 
 # ─────────────────────────────────────────────
-# Search input + TMDB suggestions
+# Fuzzy match helper
+# ─────────────────────────────────────────────
+def fuzzy_score(query: str, title: str) -> float:
+    """
+    Returns a similarity score between query and title.
+    Combines:
+      - SequenceMatcher ratio (character similarity)
+      - Substring boost (if query appears inside title)
+    """
+    q = query.lower().strip()
+    t = title.lower().strip()
+
+    ratio = SequenceMatcher(None, q, t).ratio()
+
+    # Boost if query is a substring of title
+    if q in t:
+        ratio = min(1.0, ratio + 0.3)
+
+    # Boost if title starts with query
+    if t.startswith(q):
+        ratio = min(1.0, ratio + 0.2)
+
+    return ratio
+
+
+def sort_by_fuzzy(query: str, results: list[dict]) -> list[dict]:
+    """Sort TMDB search results by fuzzy match score against query."""
+    scored = [
+        (r, fuzzy_score(query, r.get("title", "")))
+        for r in results
+    ]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [r for r, _ in scored]
+
+
+# ─────────────────────────────────────────────
+# Search input
 # ─────────────────────────────────────────────
 movie_name = st.text_input(
     "🔍 Search for a movie",
     placeholder="Type a movie name (e.g. Interstellar, Dangal, Conjuring)"
 )
-
-# ── TMDB suggestions as you type ─────────────────────────────────────
-if movie_name.strip():
-    with st.spinner("Fetching suggestions..."):
-        suggestions = search_movies_tmdb(movie_name, page=1)
-
-    if suggestions:
-        st.caption("💡 Did you mean:")
-        sug_cols = st.columns(min(len(suggestions[:5]), 5))
-        for i, sug in enumerate(suggestions[:5]):
-            with sug_cols[i]:
-                label = sug.get("title", "")
-                year  = (sug.get("release_date") or "")[:4]
-                btn_label = f"{label} ({year})" if year else label
-                if st.button(btn_label, key=f"sug_{sug['id']}", use_container_width=True):
-                    st.session_state["_suggestion_clicked"] = sug["title"]
-                    st.rerun()
-
-# Handle suggestion click
-if "_suggestion_clicked" in st.session_state:
-    movie_name = st.session_state.pop("_suggestion_clicked")
-    st.session_state.last_query               = ""
-    st.session_state.search_results           = []
-    st.session_state.display_count            = 5
-    st.session_state.has_more_search_results  = True
-    st.session_state.should_fetch_search_page = True
 
 # ── Reset on query change ─────────────────────────────────────────────
 if movie_name != st.session_state.last_query:
@@ -126,12 +138,13 @@ if movie_name.strip():
         st.session_state.should_fetch_search_page = False
 
     if st.session_state.search_results:
+        # ✅ Fuzzy re-rank results before displaying
+        ranked_results = sort_by_fuzzy(movie_name, st.session_state.search_results)
+
         st.caption("Select the movie you meant:")
         cols = st.columns(5)
 
-        for idx, movie in enumerate(
-            st.session_state.search_results[:st.session_state.display_count]
-        ):
+        for idx, movie in enumerate(ranked_results[:st.session_state.display_count]):
             with cols[idx % 5]:
                 if movie.get("poster_path"):
                     st.image(
@@ -142,7 +155,7 @@ if movie_name.strip():
                     st.write("No Image")
 
                 if st.button(movie["title"], key=f"select_{movie['id']}"):
-                    # ✅ Reset ALL UI settings when a new movie is selected
+                    # Reset ALL UI settings when a new movie is selected
                     st.session_state.selected_movie      = movie["title"]
                     st.session_state.rec_display_count   = 5
                     st.session_state.is_fallback         = False
@@ -248,8 +261,6 @@ if "selected_movie" in st.session_state:
     # ── Display results ───────────────────────────────────────────────
     results = st.session_state.all_recommendations
 
-    # ✅ REMOVED the rating re-sort — backend ordering is always correct
-
     if not results:
         st.info("No close matches found.")
     else:
@@ -270,7 +281,7 @@ if "selected_movie" in st.session_state:
                 lang_name = LANGUAGE_MAP.get(lang_code, lang_code.upper())
                 st.write(f"🔊 Original Audio: {lang_name}")
 
-                # ── Cast / Director info based on mode ────────────────
+                # ── Cast / Director info ──────────────────────────────
                 if rec_mode in ("cast", "director"):
                     movie_row = movies_df[movies_df["title"] == movie["title"]]
                     if not movie_row.empty:
