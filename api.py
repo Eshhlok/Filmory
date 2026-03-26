@@ -102,21 +102,41 @@ def format_movie(movie: dict, mode: str = "story") -> dict:
 def search(query: str, page: int = 1):
     """Search TMDB for movies — returns fields matching Movie type."""
     results = search_movies_tmdb(query, page=page)
-    return [
-        {
-            "id":                r.get("id"),
+    results_formatted = []
+
+    for r in results:
+        movie_id = r.get("id")
+
+        cast = []
+        directors = []
+
+        mc = credits_cache.get(movie_id)
+        if mc:
+            cast = mc["full_cast"][:6]
+            directors = mc["directors"]
+
+        results_formatted.append({
+            "id":                movie_id,
             "title":             r.get("title"),
             "overview":          r.get("overview", ""),
             "release_date":      r.get("release_date", ""),
             "original_language": r.get("original_language", ""),
             "vote_average":      r.get("vote_average", 0),
             "vote_count":        r.get("vote_count", 0),
-            "poster_path":       r.get("poster_path"),       # ✅ TMDB already returns path
-            "backdrop_path":     r.get("backdrop_path"),     # ✅ available from TMDB search
+            "poster_path":       r.get("poster_path"),
+            "backdrop_path":     r.get("backdrop_path"),
             "genre_ids":         r.get("genre_ids", []),
-        }
-        for r in results
-    ]
+
+            # ✅ ADD THESE
+            "genre_names": [
+                GENRE_MAP.get(gid, str(gid))
+                for gid in r.get("genre_ids", [])
+            ],
+            "cast": cast,
+            "directors": directors
+        })
+
+    return results_formatted
 
 
 # ─────────────────────────────────────────────

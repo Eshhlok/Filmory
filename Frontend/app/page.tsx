@@ -133,7 +133,7 @@ export default function Home() {
     if (!sourceMovie) return ""
     switch (selectedMode) {
       case "story":    return `Movies similar to "${sourceMovie.title}"`
-      case "cast":     return `Movies starring "${sourceMovie.cast}"`
+      case "cast":     return `Movies starring "${sourceMovie.cast?.slice(0,2).join(", ")}"`
       case "director": return `Movies directed by "${sourceMovie.directors}"`
       case "genre":    return `Movies in the same genre as "${sourceMovie.title}"`
     }
