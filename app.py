@@ -2,6 +2,7 @@ import streamlit as st
 from recommender import recommend
 from backend import movies_df, cosine_sim
 from tmdb_client import search_movies_tmdb
+from data_store import load_credits
 from config import GENRE_MAP
 
 LANGUAGE_MAP = {
@@ -31,6 +32,15 @@ st.title("🎬 Movie Recommendation System")
 st.write("Find movies similar to your favorite one!")
 
 # ─────────────────────────────────────────────
+# Load credits cache once
+# ─────────────────────────────────────────────
+@st.cache_resource
+def get_credits_cache():
+    return load_credits()
+
+credits_cache = get_credits_cache()
+
+# ─────────────────────────────────────────────
 # Session state initialisation
 # ─────────────────────────────────────────────
 defaults = {
@@ -45,6 +55,8 @@ defaults = {
     "is_fallback":               False,
     "selected_rec_mode":         "Story (Plot based)",
     "selected_filter":           "All",
+    "last_rec_mode":             "story",
+    "last_filter_option":        "All",
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -52,50 +64,40 @@ for k, v in defaults.items():
 
 
 # ─────────────────────────────────────────────
-# Search suggestions from local DB
-# ─────────────────────────────────────────────
-def get_local_suggestions(query: str, max_results: int = 8) -> list[str]:
-    """Fast local DB title search — no TMDB call needed."""
-    if not query or len(query.strip()) < 1:
-        return []
-    q = query.lower().strip()
-    matched = movies_df[
-        movies_df["title"].str.lower().str.contains(q, regex=False, na=False)
-    ]["title"].drop_duplicates()
-    return matched.head(max_results).tolist()
-
-
-# ─────────────────────────────────────────────
-# Search input
+# Search input + TMDB suggestions
 # ─────────────────────────────────────────────
 movie_name = st.text_input(
     "🔍 Search for a movie",
     placeholder="Type a movie name (e.g. Interstellar, Dangal, Conjuring)"
 )
 
-# ── Search suggestions ────────────────────────────────────────────────
+# ── TMDB suggestions as you type ─────────────────────────────────────
 if movie_name.strip():
-    suggestions = get_local_suggestions(movie_name)
+    with st.spinner("Fetching suggestions..."):
+        suggestions = search_movies_tmdb(movie_name, page=1)
+
     if suggestions:
-        st.caption("💡 Suggestions from our database:")
-        suggestion_cols = st.columns(len(suggestions))
-        for i, suggestion in enumerate(suggestions):
-            with suggestion_cols[i]:
-                if st.button(suggestion, key=f"suggestion_{i}", use_container_width=True):
-                    st.session_state.last_query        = ""   # force reset
-                    st.session_state.search_results    = []
-                    st.session_state.display_count     = 5
-                    st.session_state.has_more_search_results  = True
-                    st.session_state.should_fetch_search_page = True
-                    # Rerun with updated query via session state trick
-                    st.session_state["_suggestion_clicked"] = suggestion
+        st.caption("💡 Did you mean:")
+        sug_cols = st.columns(min(len(suggestions[:5]), 5))
+        for i, sug in enumerate(suggestions[:5]):
+            with sug_cols[i]:
+                label = sug.get("title", "")
+                year  = (sug.get("release_date") or "")[:4]
+                btn_label = f"{label} ({year})" if year else label
+                if st.button(btn_label, key=f"sug_{sug['id']}", use_container_width=True):
+                    st.session_state["_suggestion_clicked"] = sug["title"]
                     st.rerun()
 
-# Handle suggestion click — inject into search
+# Handle suggestion click
 if "_suggestion_clicked" in st.session_state:
     movie_name = st.session_state.pop("_suggestion_clicked")
+    st.session_state.last_query               = ""
+    st.session_state.search_results           = []
+    st.session_state.display_count            = 5
+    st.session_state.has_more_search_results  = True
+    st.session_state.should_fetch_search_page = True
 
-# ── Reset everything when query changes ───────────────────────────────
+# ── Reset on query change ─────────────────────────────────────────────
 if movie_name != st.session_state.last_query:
     st.session_state.search_page              = 1
     st.session_state.search_results           = []
@@ -141,13 +143,13 @@ if movie_name.strip():
 
                 if st.button(movie["title"], key=f"select_{movie['id']}"):
                     # ✅ Reset ALL UI settings when a new movie is selected
-                    st.session_state.selected_movie    = movie["title"]
-                    st.session_state.rec_display_count = 5
-                    st.session_state.is_fallback       = False
-                    st.session_state.selected_rec_mode = "Story (Plot based)"
-                    st.session_state.selected_filter   = "All"
-                    st.session_state.last_rec_mode     = "story"
-                    st.session_state.last_filter_option = "All"
+                    st.session_state.selected_movie      = movie["title"]
+                    st.session_state.rec_display_count   = 5
+                    st.session_state.is_fallback         = False
+                    st.session_state.selected_rec_mode   = "Story (Plot based)"
+                    st.session_state.selected_filter     = "All"
+                    st.session_state.last_rec_mode       = "story"
+                    st.session_state.last_filter_option  = "All"
 
                     with st.spinner(f"🎬 Finding recommendations for '{movie['title']}'..."):
                         results = recommend(
@@ -156,16 +158,14 @@ if movie_name.strip():
                             movie["title"]
                         )
 
-                    # Check if fallback was used
-                    st.session_state.is_fallback         = (len(results) > 0 and
-                        not any(
-                            movies_df["title"].str.lower() == movie["title"].lower()
-                        ) and not any(
-                            movies_df["title"].str.lower().str.contains(
-                                movie["title"].lower(), regex=False
-                            )
-                        )
+                    # Detect fallback
+                    titles_lower = movies_df["title"].str.lower()
+                    title_lower  = movie["title"].lower()
+                    in_db = (
+                        any(titles_lower == title_lower) or
+                        any(titles_lower.str.contains(title_lower, regex=False))
                     )
+                    st.session_state.is_fallback         = not in_db
                     st.session_state.all_recommendations = results
 
         # Load more button
@@ -197,7 +197,7 @@ if "selected_movie" in st.session_state:
             icon="🎭"
         )
 
-    # ── Recommendation mode — restored to last selected ───────────────
+    # ── Recommendation mode ───────────────────────────────────────────
     rec_mode_label = st.selectbox(
         "🎯 Recommendation type",
         list(REC_MODE_MAP.keys()),
@@ -207,7 +207,7 @@ if "selected_movie" in st.session_state:
     )
     rec_mode = REC_MODE_MAP[rec_mode_label]
 
-    # ── Language filter — restored to last selected ───────────────────
+    # ── Language filter ───────────────────────────────────────────────
     language_options = ["All"] + list(LANGUAGE_MAP.values())
     filter_option = st.selectbox(
         "Filter by language",
@@ -217,13 +217,7 @@ if "selected_movie" in st.session_state:
         )
     )
 
-    if "last_rec_mode" not in st.session_state:
-        st.session_state.last_rec_mode = rec_mode
-
-    if "last_filter_option" not in st.session_state:
-        st.session_state.last_filter_option = "All"
-
-    # ── Re-fetch recommendations if mode or filter changed ────────────
+    # ── Re-fetch if mode or filter changed ────────────────────────────
     if (
         filter_option != st.session_state.last_filter_option
         or rec_mode   != st.session_state.last_rec_mode
@@ -254,8 +248,7 @@ if "selected_movie" in st.session_state:
     # ── Display results ───────────────────────────────────────────────
     results = st.session_state.all_recommendations
 
-    if rec_mode != "story":
-        results = sorted(results, key=lambda x: x.get("rating") or 0, reverse=True)
+    # ✅ REMOVED the rating re-sort — backend ordering is always correct
 
     if not results:
         st.info("No close matches found.")
@@ -264,7 +257,7 @@ if "selected_movie" in st.session_state:
             col1, col2 = st.columns([1, 3])
 
             with col1:
-                if movie["poster_url"]:
+                if movie.get("poster_url"):
                     st.image(movie["poster_url"], use_container_width=True)
                 else:
                     st.write("No Image")
@@ -276,13 +269,28 @@ if "selected_movie" in st.session_state:
                 lang_code = movie.get("language", "N/A")
                 lang_name = LANGUAGE_MAP.get(lang_code, lang_code.upper())
                 st.write(f"🔊 Original Audio: {lang_name}")
-                st.write(movie["overview"])
+
+                # ── Cast / Director info based on mode ────────────────
+                if rec_mode in ("cast", "director"):
+                    movie_row = movies_df[movies_df["title"] == movie["title"]]
+                    if not movie_row.empty:
+                        mid = int(movie_row.iloc[0]["id"])
+                        mc  = credits_cache.get(mid)
+                        if mc:
+                            if rec_mode == "cast" and mc["full_cast"]:
+                                st.write("🎭 Cast: " + ", ".join(mc["full_cast"][:6]))
+                            elif rec_mode == "director" and mc["directors"]:
+                                st.write("🎬 Director: " + ", ".join(mc["directors"]))
+
+                # ── Genre tags ────────────────────────────────────────
                 if rec_mode == "genre":
                     genre_names = [
                         GENRE_MAP.get(gid, str(gid))
                         for gid in movie.get("genre_ids", [])
                     ]
-                    st.write("🎭 Genres:", ", ".join(genre_names))
+                    st.write("🎭 Genres: " + ", ".join(genre_names))
+
+                st.write(movie["overview"])
 
         # Load more recommendations
         if st.session_state.rec_display_count < len(results):
