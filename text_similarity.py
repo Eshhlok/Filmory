@@ -29,6 +29,11 @@ def build_features(movies_df):
 
 
 def build_text_similarity(movies_df):
+    # Only include movies that have a meaningful overview — empty overviews
+    # contribute nothing to TF-IDF and drag down story-mode results.
+    has_overview = movies_df["overview"].fillna("").str.strip().str.len() > 20
+    pct = has_overview.sum() / len(movies_df) * 100
+    print(f"✅ Building TF-IDF on {has_overview.sum()}/{len(movies_df)} movies with overviews ({pct:.1f}%)")
 
     tfidf = TfidfVectorizer(
         stop_words="english",
@@ -36,11 +41,22 @@ def build_text_similarity(movies_df):
     )
 
     tfidf_matrix = tfidf.fit_transform(
-        movies_df["combined_features"]
+        movies_df.loc[has_overview, "combined_features"]
     )
 
     global cosine_sim
-    cosine_sim = cosine_similarity(tfidf_matrix)
+    # Build full-size matrix so indices align with movies_df
+    # Movies without overviews get zero similarity to everything
+    from scipy.sparse import csr_matrix
+    import numpy as np
+
+    n = len(movies_df)
+    full_matrix = csr_matrix((n, tfidf_matrix.shape[1]))
+    idx_map = movies_df.index[has_overview].tolist()
+    for new_i, orig_i in enumerate(idx_map):
+        full_matrix[orig_i] = tfidf_matrix[new_i]
+
+    cosine_sim = cosine_similarity(full_matrix)
 
     return tfidf, cosine_sim
 
