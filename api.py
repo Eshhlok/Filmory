@@ -42,16 +42,16 @@ IMAGE_BASE     = "https://image.tmdb.org/t/p/w500"
 BACKDROP_BASE  = "https://image.tmdb.org/t/p/w1280"
 
 
-def extract_poster_path(poster_url: str):
-    if not poster_url:
+def extract_poster_path(poster_url):
+    if not poster_url or not isinstance(poster_url, str):
         return None
     if poster_url.startswith(IMAGE_BASE):
         return poster_url[len(IMAGE_BASE):]
     return poster_url
 
 
-def extract_backdrop_path(backdrop_url: str):
-    if not backdrop_url:
+def extract_backdrop_path(backdrop_url):
+    if not backdrop_url or not isinstance(backdrop_url, str):
         return None
     if backdrop_url.startswith(BACKDROP_BASE):
         return backdrop_url[len(BACKDROP_BASE):]
