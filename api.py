@@ -42,7 +42,7 @@ IMAGE_BASE     = "https://image.tmdb.org/t/p/w500"
 BACKDROP_BASE  = "https://image.tmdb.org/t/p/w1280"
 
 
-def extract_poster_path(poster_url: str | None) -> str | None:
+def extract_poster_path(poster_url: str):
     if not poster_url:
         return None
     if poster_url.startswith(IMAGE_BASE):
@@ -50,7 +50,7 @@ def extract_poster_path(poster_url: str | None) -> str | None:
     return poster_url
 
 
-def extract_backdrop_path(backdrop_url: str | None) -> str | None:
+def extract_backdrop_path(backdrop_url: str):
     if not backdrop_url:
         return None
     if backdrop_url.startswith(BACKDROP_BASE):
