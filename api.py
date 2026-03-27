@@ -13,7 +13,10 @@ app = FastAPI(title="Movie Recommender API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # tighten to your Vercel/Netlify URL after deploy
+    allow_origins=["https://filmory-movies.vercel.app",
+                    "http://localhost:3000",
+                    "http://localhost:5173"
+                  ], 
     allow_methods=["*"],
     allow_headers=["*"],
 )
