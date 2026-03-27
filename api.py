@@ -132,20 +132,29 @@ def get_recommendations(
     is_fallback = not in_db
 
     for movie in results:
-        row = movies_df[movies_df["title"] == movie["title"]]
-        if not row.empty:
-            mid = int(row.iloc[0]["id"])
-            movie["backdrop_url"] = row.iloc[0].get("backdrop_url")
-            mc = credits_cache.get(mid)
-            if mc:
-                movie["cast"]      = mc["full_cast"][:6]
-                movie["directors"] = mc["directors"]
+        mid = movie.get("id")
 
-        movie["genre_names"] = [
-            GENRE_MAP.get(gid, str(gid))
-            for gid in movie.get("genre_ids", [])
-        ]
+        if mid is not None:
+            row = movies_df[movies_df["id"] == mid]
 
+            if not row.empty:
+                db_row = row.iloc[0]
+
+                movie["genre_ids"] = db_row.get("genre_ids", [])
+                movie["genre_names"] = db_row.get("genre_names", [])
+                movie["backdrop_url"] = db_row.get("backdrop_url")
+
+                mc = credits_cache.get(int(mid))
+                if mc:
+                    movie["cast"] = mc["full_cast"][:6]
+                    movie["directors"] = mc["directors"]
+
+        # fallback if still missing
+        if not movie.get("genre_names"):
+            movie["genre_names"] = [
+                GENRE_MAP.get(gid, str(gid))
+                for gid in movie.get("genre_ids", [])
+            ]
     return {
         "is_fallback": is_fallback,
         "results":     [format_movie(m, mode) for m in results]
