@@ -5,7 +5,7 @@ from typing import Optional
 
 from backend import movies_df, cosine_sim
 from recommender import recommend
-from tmdb_client import search_movies_tmdb, get_cast_and_director
+from tmdb_client import search_movies_tmdb
 from data_store import load_credits, save_feedback
 from config import GENRE_MAP
 
@@ -13,10 +13,11 @@ app = FastAPI(title="Movie Recommender API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://filmory-movies.vercel.app",
-                    "http://localhost:3000",
-                    "http://localhost:5173"
-                  ], 
+    allow_origins=[
+        "https://filmory-movies.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -38,8 +39,8 @@ LANGUAGE_MAP = {
     "kn": "Kannada"
 }
 
-IMAGE_BASE     = "https://image.tmdb.org/t/p/w500"
-BACKDROP_BASE  = "https://image.tmdb.org/t/p/w1280"
+IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
+BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
 
 
 def extract_poster_path(poster_url):
@@ -59,22 +60,22 @@ def extract_backdrop_path(backdrop_url):
 
 
 def format_movie(movie: dict, mode: str = "story") -> dict:
-    poster_path   = extract_poster_path(movie.get("poster_url"))
+    poster_path = extract_poster_path(movie.get("poster_url"))
     backdrop_path = extract_backdrop_path(movie.get("backdrop_url"))
 
     entry = {
-        "id":                movie.get("id"),
-        "title":             movie.get("title"),
-        "overview":          movie.get("overview", ""),
-        "release_date":      movie.get("release_date", ""),
+        "id": movie.get("id"),
+        "title": movie.get("title"),
+        "overview": movie.get("overview", ""),
+        "release_date": movie.get("release_date", ""),
         "original_language": movie.get("language", ""),
-        "vote_average":      movie.get("rating") or 0,
-        "vote_count":        0,
-        "poster_path":       poster_path,
-        "backdrop_path":     backdrop_path,
-        "genre_ids":         movie.get("genre_ids", []),
-        "genre_names":       movie.get("genre_names", []),
-        "language_name":     LANGUAGE_MAP.get(movie.get("language", ""), ""),
+        "vote_average": movie.get("rating") or 0,
+        "vote_count": 0,
+        "poster_path": poster_path,
+        "backdrop_path": backdrop_path,
+        "genre_ids": movie.get("genre_ids", []),
+        "genre_names": movie.get("genre_names", []),
+        "language_name": LANGUAGE_MAP.get(movie.get("language", ""), ""),
     }
 
     if mode == "cast":
@@ -85,38 +86,38 @@ def format_movie(movie: dict, mode: str = "story") -> dict:
     return entry
 
 
-# ─────────────────────────────────────────────
+# ---------------------------
 # /search
-# ─────────────────────────────────────────────
+# ---------------------------
 @app.get("/search")
 def search(query: str, page: int = 1):
     results = search_movies_tmdb(query, page=page)
     return [
         {
-            "id":                r.get("id"),
-            "title":             r.get("title"),
-            "overview":          r.get("overview", ""),
-            "release_date":      r.get("release_date", ""),
+            "id": r.get("id"),
+            "title": r.get("title"),
+            "overview": r.get("overview", ""),
+            "release_date": r.get("release_date", ""),
             "original_language": r.get("original_language", ""),
-            "vote_average":      r.get("vote_average", 0),
-            "vote_count":        r.get("vote_count", 0),
-            "poster_path":       r.get("poster_path"),
-            "backdrop_path":     r.get("backdrop_path"),
-            "genre_ids":         r.get("genre_ids", []),
+            "vote_average": r.get("vote_average", 0),
+            "vote_count": r.get("vote_count", 0),
+            "poster_path": r.get("poster_path"),
+            "backdrop_path": r.get("backdrop_path"),
+            "genre_ids": r.get("genre_ids", []),
         }
         for r in results
     ]
 
 
-# ─────────────────────────────────────────────
+# ---------------------------
 # /recommend
-# ─────────────────────────────────────────────
+# ---------------------------
 @app.get("/recommend")
 def get_recommendations(
-    title:    str,
-    mode:     str = "story",
+    title: str,
+    mode: str = "story",
     language: Optional[str] = None,
-    top_n:    int = 30
+    top_n: int = 30,
 ):
     results = recommend(
         movies_df, cosine_sim, title,
@@ -124,25 +125,29 @@ def get_recommendations(
     )
 
     titles_lower = movies_df["title"].str.lower()
-    title_lower  = title.lower().strip()
+    title_lower = title.lower().strip()
+
     in_db = (
         any(titles_lower == title_lower) or
         any(titles_lower.str.contains(title_lower, regex=False, na=False))
     )
+
     is_fallback = not in_db
 
     for movie in results:
         row = movies_df[movies_df["title"] == movie["title"]]
+
         if not row.empty:
-            mid = int(row.iloc[0]["id"])
             db_row = row.iloc[0]
+            mid = int(db_row["id"])
+
             movie["id"] = mid
-            movie["genre_ids"] = db_row["genre_ids"]
-            movie["genre_names"] = db_row["genre_names"]
-            movie["backdrop_url"] = db_row["backdrop_url"]
+            movie["genre_ids"] = db_row.get("genre_ids", [])
+            movie["backdrop_url"] = db_row.get("backdrop_url")
+
             mc = credits_cache.get(mid)
             if mc:
-                movie["cast"]      = mc["full_cast"][:6]
+                movie["cast"] = mc["full_cast"][:6]
                 movie["directors"] = mc["directors"]
 
         movie["genre_names"] = [
@@ -152,13 +157,13 @@ def get_recommendations(
 
     return {
         "is_fallback": is_fallback,
-        "results":     [format_movie(m, mode) for m in results]
+        "results": [format_movie(m, mode) for m in results],
     }
 
 
-# ─────────────────────────────────────────────
+# ---------------------------
 # /languages
-# ─────────────────────────────────────────────
+# ---------------------------
 @app.get("/languages")
 def get_languages():
     lang_codes = movies_df["language"].dropna().unique().tolist()
@@ -169,11 +174,11 @@ def get_languages():
     ]
 
 
-# ─────────────────────────────────────────────
+# ---------------------------
 # /feedback
-# ─────────────────────────────────────────────
+# ---------------------------
 class FeedbackRequest(BaseModel):
-    rating:  int   = Field(..., ge=1, le=5)
+    rating: int = Field(..., ge=1, le=5)
     comment: str | None = Field(None, max_length=500)
 
 
@@ -181,6 +186,6 @@ class FeedbackRequest(BaseModel):
 def submit_feedback(body: FeedbackRequest):
     try:
         save_feedback(body.rating, body.comment)
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to save feedback.")
     return {"status": "ok"}
