@@ -256,3 +256,9 @@
 .filmory-stagger > *:nth-child(3) { animation-delay: 0.15s; }
 .filmory-stagger > *:nth-child(4) { animation-delay: 0.2s; }
 .filmory-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.filmory-stagger > *:nth-child(6)  { animation-delay: 0.30s; }
+.filmory-stagger > *:nth-child(7)  { animation-delay: 0.32s; }
+.filmory-stagger > *:nth-child(8)  { animation-delay: 0.34s; }
+.filmory-stagger > *:nth-child(9)  { animation-delay: 0.36s; }
+.filmory-stagger > *:nth-child(10) { animation-delay: 0.38s; }
+.filmory-stagger > *:nth-child(n+11) { animation-delay: 0.40s; }

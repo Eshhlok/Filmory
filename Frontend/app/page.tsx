@@ -362,7 +362,7 @@ export default function Home() {
             </div>
 
             {/* ✅ Fix 3: index fallback for recommendation grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6 filmory-stagger">
               {recommendations.map((movie, i) => (
                 <MovieCard
                   key={movie.id ?? `rec-${i}`}
