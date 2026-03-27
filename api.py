@@ -132,47 +132,24 @@ def get_recommendations(
     is_fallback = not in_db
 
     for movie in results:
-        mid = movie.get("id")
-        row = None
+        row = movies_df[movies_df["title"] == movie["title"]]
+        if not row.empty:
+            mid = int(row.iloc[0]["id"])
+            db_row = row.iloc[0]
+            movie["id"] = mid
+            movie["genre_ids"] = db_row.get("genre_ids", [])
+            movie["genre_names"] = db_row.get("genre_names", [])
+            movie["backdrop_url"] = row.get("backdrop_url")
+            mc = credits_cache.get(mid)
+            if mc:
+                movie["cast"]      = mc["full_cast"][:6]
+                movie["directors"] = mc["directors"]
 
-        # 1. Try ID match (best)
-        if mid is not None:
-            row = movies_df[movies_df["id"] == mid]
-
-        # 2. fallback to title match
-        if row is None or row.empty:
-            row = movies_df[
-                movies_df["title"].str.lower().str.strip()
-                == movie["title"].lower().strip()
-            ]
-
-        # 3. fallback contains
-        if row.empty:
-            row = movies_df[
-                movies_df["title"].str.lower().str.contains(
-                    movie["title"].lower(), na=False
-                )
-            ]
-
-    if not row.empty:
-        db_row = row.iloc[0]
-
-        movie["id"] = int(db_row["id"])
-        movie["genre_ids"] = db_row.get("genre_ids", [])
-        movie["genre_names"] = db_row.get("genre_names", [])
-        movie["backdrop_url"] = db_row.get("backdrop_url")
-
-        mc = credits_cache.get(int(db_row["id"]))
-        if mc:
-            movie["cast"] = mc["full_cast"][:6]
-            movie["directors"] = mc["directors"]
-
-    # fallback genre map
-    if not movie.get("genre_names"):
         movie["genre_names"] = [
             GENRE_MAP.get(gid, str(gid))
-                for gid in movie.get("genre_ids", [])
+            for gid in movie.get("genre_ids", [])
         ]
+
     return {
         "is_fallback": is_fallback,
         "results":     [format_movie(m, mode) for m in results]
