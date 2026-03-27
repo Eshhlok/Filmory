@@ -1,18 +1,19 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from backend import movies_df, cosine_sim
 from recommender import recommend
 from tmdb_client import search_movies_tmdb, get_cast_and_director
-from data_store import load_credits
+from data_store import load_credits, save_feedback
 from config import GENRE_MAP
 
 app = FastAPI(title="Movie Recommender API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],   # tighten to your Vercel/Netlify URL after deploy
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -34,16 +35,11 @@ LANGUAGE_MAP = {
     "kn": "Kannada"
 }
 
-IMAGE_BASE = "https://image.tmdb.org/t/p/w500"
+IMAGE_BASE     = "https://image.tmdb.org/t/p/w500"
+BACKDROP_BASE  = "https://image.tmdb.org/t/p/w1280"
 
-BACKDROP_BASE = "https://image.tmdb.org/t/p/w1280"
 
 def extract_poster_path(poster_url: str | None) -> str | None:
-    """
-    Convert full poster URL back to just the path.
-    e.g. "https://image.tmdb.org/t/p/w500/abc123.jpg" → "/abc123.jpg"
-    MovieCard expects just the path, not the full URL.
-    """
     if not poster_url:
         return None
     if poster_url.startswith(IMAGE_BASE):
@@ -52,10 +48,6 @@ def extract_poster_path(poster_url: str | None) -> str | None:
 
 
 def extract_backdrop_path(backdrop_url: str | None) -> str | None:
-    """
-    Convert full backdrop URL back to just the path.
-    e.g. "https://image.tmdb.org/t/p/w1280/abc123.jpg" → "/abc123.jpg"
-    """
     if not backdrop_url:
         return None
     if backdrop_url.startswith(BACKDROP_BASE):
@@ -64,10 +56,6 @@ def extract_backdrop_path(backdrop_url: str | None) -> str | None:
 
 
 def format_movie(movie: dict, mode: str = "story") -> dict:
-    """
-    Convert a recommendation result dict into the shape
-    that the MovieCard and MovieDetail components expect.
-    """
     poster_path   = extract_poster_path(movie.get("poster_url"))
     backdrop_path = extract_backdrop_path(movie.get("backdrop_url"))
 
@@ -78,15 +66,14 @@ def format_movie(movie: dict, mode: str = "story") -> dict:
         "release_date":      movie.get("release_date", ""),
         "original_language": movie.get("language", ""),
         "vote_average":      movie.get("rating") or 0,
-        "vote_count":        0,                          # not stored in our DB
-        "poster_path":       poster_path,                # ✅ path only, not full URL
-        "backdrop_path":     backdrop_path,              # ✅ populated from DB
+        "vote_count":        0,
+        "poster_path":       poster_path,
+        "backdrop_path":     backdrop_path,
         "genre_ids":         movie.get("genre_ids", []),
         "genre_names":       movie.get("genre_names", []),
         "language_name":     LANGUAGE_MAP.get(movie.get("language", ""), ""),
     }
 
-    # Add cast/director for relevant modes
     if mode == "cast":
         entry["cast"] = movie.get("cast", [])
     elif mode == "director":
@@ -100,23 +87,10 @@ def format_movie(movie: dict, mode: str = "story") -> dict:
 # ─────────────────────────────────────────────
 @app.get("/search")
 def search(query: str, page: int = 1):
-    """Search TMDB for movies — returns fields matching Movie type."""
     results = search_movies_tmdb(query, page=page)
-    results_formatted = []
-
-    for r in results:
-        movie_id = r.get("id")
-
-        cast = []
-        directors = []
-
-        mc = credits_cache.get(movie_id)
-        if mc:
-            cast = mc["full_cast"][:6]
-            directors = mc["directors"]
-
-        results_formatted.append({
-            "id":                movie_id,
+    return [
+        {
+            "id":                r.get("id"),
             "title":             r.get("title"),
             "overview":          r.get("overview", ""),
             "release_date":      r.get("release_date", ""),
@@ -126,17 +100,9 @@ def search(query: str, page: int = 1):
             "poster_path":       r.get("poster_path"),
             "backdrop_path":     r.get("backdrop_path"),
             "genre_ids":         r.get("genre_ids", []),
-
-            # ✅ ADD THESE
-            "genre_names": [
-                GENRE_MAP.get(gid, str(gid))
-                for gid in r.get("genre_ids", [])
-            ],
-            "cast": cast,
-            "directors": directors
-        })
-
-    return results_formatted
+        }
+        for r in results
+    ]
 
 
 # ─────────────────────────────────────────────
@@ -150,15 +116,10 @@ def get_recommendations(
     top_n:    int = 30
 ):
     results = recommend(
-        movies_df,
-        cosine_sim,
-        title,
-        top_n=top_n,
-        language_filter=language,
-        mode=mode
+        movies_df, cosine_sim, title,
+        top_n=top_n, language_filter=language, mode=mode
     )
 
-    # Detect fallback
     titles_lower = movies_df["title"].str.lower()
     title_lower  = title.lower().strip()
     in_db = (
@@ -167,16 +128,12 @@ def get_recommendations(
     )
     is_fallback = not in_db
 
-    # Enrich with credits + backdrop
     for movie in results:
         row = movies_df[movies_df["title"] == movie["title"]]
         if not row.empty:
             mid = int(row.iloc[0]["id"])
-
-            # ✅ Pull backdrop_url stored in DB
             movie["backdrop_url"] = row.iloc[0].get("backdrop_url")
-
-            mc  = credits_cache.get(mid)
+            mc = credits_cache.get(mid)
             if mc:
                 movie["cast"]      = mc["full_cast"][:6]
                 movie["directors"] = mc["directors"]
@@ -203,3 +160,20 @@ def get_languages():
         for code in sorted(lang_codes)
         if code in LANGUAGE_MAP
     ]
+
+
+# ─────────────────────────────────────────────
+# /feedback
+# ─────────────────────────────────────────────
+class FeedbackRequest(BaseModel):
+    rating:  int   = Field(..., ge=1, le=5)
+    comment: str | None = Field(None, max_length=500)
+
+
+@app.post("/feedback", status_code=201)
+def submit_feedback(body: FeedbackRequest):
+    try:
+        save_feedback(body.rating, body.comment)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to save feedback.")
+    return {"status": "ok"}
