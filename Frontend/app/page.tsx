@@ -7,6 +7,7 @@ import { MovieDetail } from "@/components/movie-detail"
 import { LoadingScreen } from "@/components/loading-screen"
 import { Spinner } from "@/components/ui/spinner"
 import type { Movie, RecommendationType } from "@/lib/types"
+import { AnimatedMovieCard } from "@/components/animated-movie-card"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -92,12 +93,16 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [isLoadingRecommendations])
 
-  const getRecommendations = async (movie: Movie, mode: RecommendationType) => {
+  const getRecommendations = async (movie: Movie, mode: RecommendationType,languageOverride?: string) => {
     setIsLoadingRecommendations(true)
     setLoadingMessage(LOADING_MESSAGES[0])
     setIsFallbackResults(false)
 
-    const { is_fallback, results } = await apiRecommend(movie.title, mode, selectedLanguage)
+    const { is_fallback, results } = await apiRecommend(
+                                     movie.title,
+                                     mode,
+                                     languageOverride !== undefined ? languageOverride : selectedLanguage
+                                    )
 
     setRecommendations(results)
     setIsFallbackResults(is_fallback)
@@ -118,7 +123,7 @@ export default function Home() {
 
   const handleLanguageChange = (lang: string) => {
     setSelectedLanguage(lang)
-    if (sourceMovie) getRecommendations(sourceMovie, selectedMode)
+    if (sourceMovie) getRecommendations(sourceMovie, selectedMode,lang)
   }
 
   const clearAll = () => {
@@ -151,9 +156,14 @@ export default function Home() {
               <div className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center">
                 <Film className="w-5 h-5 text-white" />
               </div>
-              <span className="font-serif text-2xl text-stone-800 group-hover:text-amber-700 transition-colors hidden sm:block">
-                Filmory
-              </span>
+              <div className="hidden sm:flex items-baseline gap-2">
+                <span className="font-serif text-3xl text-stone-800 group-hover:text-amber-700 transition-colors">
+                  Filmory
+                </span>
+                <span className="text-stone-400 text-base font-sans group-hover:text-amber-500 transition-colors">
+                   - Your Curated Cinema Catalogue
+                </span>
+              </div>
             </button>
 
             <select
@@ -364,9 +374,10 @@ export default function Home() {
             {/* ✅ Fix 3: index fallback for recommendation grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
               {recommendations.map((movie, i) => (
-                <MovieCard
+                <AnimatedMovieCard
                   key={movie.id ?? `rec-${i}`}
                   movie={movie}
+                  index={i}
                   onClick={setSelectedMovie}
                 />
               ))}

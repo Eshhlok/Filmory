@@ -194,3 +194,71 @@
 .animate-hero {
   animation: hero-out 0.25s ease forwards;
 }
+/* backdrop fade */
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-backdrop {
+  animation: backdrop-in .2s ease-out;
+}
+
+
+/* modal cinematic pop */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-modal {
+  animation: modal-in .28s cubic-bezier(.22,.61,.36,1);
+}
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes filmory-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.filmory-stagger > * {
+  opacity: 0;
+  animation: filmory-fade-up 0.35s ease forwards;
+}
+
+.filmory-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.filmory-stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.filmory-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.filmory-stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.filmory-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.filmory-stagger > *:nth-child(6)  { animation-delay: 0.30s; }
+.filmory-stagger > *:nth-child(7)  { animation-delay: 0.32s; }
+.filmory-stagger > *:nth-child(8)  { animation-delay: 0.34s; }
+.filmory-stagger > *:nth-child(9)  { animation-delay: 0.36s; }
+.filmory-stagger > *:nth-child(10) { animation-delay: 0.38s; }
+.filmory-stagger > *:nth-child(n+11) { animation-delay: 0.40s; }
