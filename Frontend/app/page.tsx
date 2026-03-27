@@ -411,6 +411,20 @@ export default function Home() {
       <footer className="border-t border-stone-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 text-center text-stone-500 text-sm">
           <p>Built with love for film enthusiasts.</p>
+          <p className="mt-2">
+            A project by <span className="text-stone-700 font-medium">Eshlok Agarwal</span>
+            {" • "}
+      
+             <a href="https://www.linkedin.com/in/eshlok-agarwal-134877380/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-600 hover:text-amber-700 hover:underline transition-colors cursor-pointer font-medium"
+            >
+              LinkedIn
+            </a>
+            {" • "}
+             2026
+          </p>
         </div>
       </footer>
 
