@@ -175,24 +175,24 @@ export function MovieDetail({ movie, onClose, onRecommend }: MovieDetailProps) {
               </p>
 
               <div className="flex flex-wrap gap-2">
-                <Button onClick={() => onRecommend(movie, "story")} variant="outline">
+                <Button onClick={() => onRecommend(movie, "story")} variant="outline" className="cursor-pointer">
                   Story / Plot
                 </Button>
 
                 {topCast.length > 0 && (
-                  <Button onClick={() => onRecommend(movie, "cast")} variant="outline">
+                  <Button onClick={() => onRecommend(movie, "cast")} variant="outline" className="cursor-pointer">
                     Cast
                   </Button>
                 )}
 
                 {director && (
-                  <Button onClick={() => onRecommend(movie, "director")} variant="outline">
+                  <Button onClick={() => onRecommend(movie, "director")} variant="outline" className="cursor-pointer">
                     Director
                   </Button>
                 )}
 
                 {genres.length > 0 && (
-                  <Button onClick={() => onRecommend(movie, "genre")} variant="outline">
+                  <Button onClick={() => onRecommend(movie, "genre")} variant="outline" className="cursor-pointer">
                     Genre
                   </Button>
                 )}
