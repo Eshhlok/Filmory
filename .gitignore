@@ -1,24 +1,11 @@
-# secrets
 .env
 databasepassword
-
-# database
-*.db
 movies
 
-# python
 __pycache__/
 *.pyc
-
-# env
 venv/
 .venv/
 
-# frontend
 Frontend/node_modules
 Frontend/dist
-Frontend/build
-
-# misc
-*.log
-.DS_Store
