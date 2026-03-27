@@ -228,7 +228,7 @@ def fetch_movies(language_code: str, genre_id: int, pages: int) -> list[dict]:
         try:
             params = {
                 "api_key":     API_KEY,
-                "language":    base_lang,
+                "language":    "en-US",   # always fetch English overviews for story mode
                 "with_genres": genre_id,
                 "sort_by":     "vote_count.desc",
                 "page":        page
