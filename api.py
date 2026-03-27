@@ -137,9 +137,9 @@ def get_recommendations(
             mid = int(row.iloc[0]["id"])
             db_row = row.iloc[0]
             movie["id"] = mid
-            movie["genre_ids"] = db_row.get("genre_ids", [])
-            movie["genre_names"] = db_row.get("genre_names", [])
-            movie["backdrop_url"] = row.get("backdrop_url")
+            movie["genre_ids"] = db_row["genre_ids"]
+            movie["genre_names"] = db_row["genre_names"]
+            movie["backdrop_url"] = db_row["backdrop_url"]
             mc = credits_cache.get(mid)
             if mc:
                 movie["cast"]      = mc["full_cast"][:6]
