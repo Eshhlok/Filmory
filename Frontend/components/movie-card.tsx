@@ -50,6 +50,7 @@ export function MovieCard({ movie, onClick, showRank }: MovieCardProps) {
             <span className="flex items-center gap-1">
               <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
               {movie.vote_average.toFixed(1)}
+              
             </span>
           </>
         )}
