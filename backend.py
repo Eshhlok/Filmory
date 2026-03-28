@@ -5,7 +5,7 @@ init_db()
 movies_df = load_movies()
 movies_df.reset_index(drop=True, inplace=True)
 movies_df = build_features(movies_df)
-tfidf, cosine_sim = build_text_similarity(movies_df)
+tfidf, tfidf_matrix = build_text_similarity(movies_df)
 
 # Pre-cache cast & director for all movies into SQLite
 # Only fetches movies not already cached — fast on subsequent runs

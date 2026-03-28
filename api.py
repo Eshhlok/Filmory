@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from datetime import datetime
 import uuid
 
-from backend import movies_df, cosine_sim
+from backend import movies_df, tfidf_matrix
 from recommender import recommend
 from tmdb_client import search_movies_tmdb
 from data_store import load_credits, save_feedback
@@ -123,7 +123,7 @@ def get_recommendations(
     top_n: int = 30,
 ):
     results = recommend(
-        movies_df, cosine_sim, title,
+        movies_df, tfidf_matrix, title,
         top_n=top_n, language_filter=language, mode=mode
     )
 

@@ -6,10 +6,7 @@ from tmdb_client import search_movies_tmdb
 
 
 def _get_tmdb_metadata(movie_title: str) -> dict | None:
-    """
-    Fetch genre_ids, overview and original_language for a movie from TMDB.
-    Returns None if not found.
-    """
+    """Fetch genre_ids, overview and language for a movie from TMDB."""
     results = search_movies_tmdb(movie_title)
     if not results:
         return None
@@ -33,12 +30,12 @@ def _get_tmdb_metadata(movie_title: str) -> dict | None:
 
 def _fallback_recommend(
     movies_df: pd.DataFrame,
-    cosine_sim,
+    tfidf_matrix,           # ✅ sparse matrix
     movie_title: str,
     top_n: int = 30
 ) -> list[dict]:
     """
-    Called only when the movie truly cannot be found in DB at all.
+    Called when movie is not found in DB.
     Uses TMDB genre + plot to find similar movies, same language first.
     """
     print(f"⚠️  '{movie_title}' not found in DB. Fetching metadata from TMDB for fallback...")
@@ -54,7 +51,7 @@ def _fallback_recommend(
 
     print(f"   → Genres: {seed_genres}, Language: {seed_language}")
 
-    # ── Genre scores ──────────────────────────────────────────────────
+    # Genre scores
     genre_scores: dict[int, float] = {}
     for idx, row in movies_df.iterrows():
         row_genres = set(row.get("genre_ids", []))
@@ -62,7 +59,7 @@ def _fallback_recommend(
         if shared:
             genre_scores[idx] = len(shared) * 2
 
-    # ── Story / TF-IDF scores ─────────────────────────────────────────
+    # TF-IDF story scores — compute on demand against TMDB overview
     story_scores: dict[int, float] = {}
     if seed_overview.strip():
         from sklearn.feature_extraction.text import TfidfVectorizer
@@ -80,17 +77,17 @@ def _fallback_recommend(
             if score > 0.01:
                 story_scores[idx] = float(score)
 
-    # ── Combine scores ────────────────────────────────────────────────
+    # Combine
     all_indices = set(genre_scores) | set(story_scores)
-    combined: list[tuple[int, float]] = [
-        (idx, genre_scores.get(idx, 0) + story_scores.get(idx, 0))
-        for idx in all_indices
-    ]
-    combined.sort(key=lambda x: x[1], reverse=True)
+    combined    = sorted(
+        [(idx, genre_scores.get(idx, 0) + story_scores.get(idx, 0)) for idx in all_indices],
+        key=lambda x: x[1],
+        reverse=True
+    )
 
-    # ── Same language first, then others ─────────────────────────────
-    same_lang  = []
-    other_lang = []
+    # Same language first
+    same_lang   = []
+    other_lang  = []
     seen_titles = set()
 
     for idx, score in combined:
@@ -124,7 +121,7 @@ def _fallback_recommend(
 
 def recommend(
     movies_df: pd.DataFrame,
-    cosine_sim,
+    tfidf_matrix,           # ✅ sparse matrix instead of cosine_sim
     movie_title: str,
     top_n: int = 30,
     language_filter: str | None = None,
@@ -134,31 +131,29 @@ def recommend(
     Main recommendation entry point.
 
     Flow:
-      1. Use _find_seed_movie() — smart 4-step lookup that handles
-         regional titles like दंगल when user types 'dangal'
+      1. Smart 4-step lookup via _find_seed_movie()
       2. If found → route to correct mode
-      3. If NOT found → generic TMDB metadata fallback
+      3. If NOT found → TMDB metadata fallback
     """
 
-    # ── Smart lookup — handles English input for regional titles ──────
+    # Smart lookup — handles regional titles
     seed_idx, seed_movie = _find_seed_movie(movies_df, movie_title)
 
-    # ── Movie NOT in DB → generic fallback ───────────────────────────
+    # Not in DB → fallback
     if seed_idx is None:
-        results = _fallback_recommend(movies_df, cosine_sim, movie_title, top_n)
+        results = _fallback_recommend(movies_df, tfidf_matrix, movie_title, top_n)
         if language_filter:
             results = [r for r in results if r["language"] == language_filter]
         return results
 
-    # ── Movie found → route to correct mode ──────────────────────────
-    # Use the actual DB title (e.g. "दंगल") for downstream lookups
+    # Found → use actual DB title for downstream lookups
     db_title = seed_movie["title"]
 
     if mode == "story":
         return get_story_recommendations(
             movies_df,
-            cosine_sim,
-            db_title,        # ✅ use DB title, not user input
+            tfidf_matrix,   # ✅ sparse matrix
+            db_title,
             top_n,
             language_filter
         )
@@ -166,7 +161,7 @@ def recommend(
     elif mode in ("cast", "director"):
         return get_people_recommendations(
             movies_df,
-            db_title,        # ✅ use DB title, not user input
+            db_title,
             top_n,
             language_filter,
             mode
