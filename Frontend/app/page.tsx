@@ -197,6 +197,11 @@ export default function Home() {
               <div className="w-10 h-10 rounded-full bg-amber-600 flex items-center justify-center">
                 <Film className="w-5 h-5 text-white" />
               </div>
+              <div className="flex items-baseline gap-2 sm:hidden">
+                <span className="font-serif text-xl text-stone-800 group-hover:text-amber-700 transition-colors">
+                  Filmory
+                </span>
+              </div>
               <div className="hidden sm:flex items-baseline gap-2">
                 <span className="font-serif text-3xl text-stone-800 group-hover:text-amber-700 transition-colors">
                   Filmory
