@@ -127,11 +127,12 @@ export default function Home() {
     }
     return movie
   }
-  const handleSelectSourceMovie = (movie: Movie) => {
-    setSourceMovie(movie)
-    setSearchQuery(movie.title)
+  const handleSelectSourceMovie = async(movie: Movie) => {
+    const fullMovie = await fetchFullMovieDetails(movie)
+    setSourceMovie(fullMovie)
+    setSearchQuery(fullMovie.title)
     setSearchResults([])
-    getRecommendations(movie, selectedMode)
+    getRecommendations(fullMovie, selectedMode)
   }
 
   const handleModeChange = (mode: RecommendationType) => {
@@ -155,10 +156,32 @@ export default function Home() {
   const getRecommendationLabel = () => {
     if (!sourceMovie) return ""
     switch (selectedMode) {
-      case "story":    return `Movies similar to "${sourceMovie.title}"`
-      case "cast":     return `Movies starring "${sourceMovie.cast?.slice(0,2).join(", ")}"`
-      case "director": return `Movies directed by "${sourceMovie.directors}"`
-      case "genre":    return `Movies in the same genre as "${sourceMovie.title}"`
+      case "story":    
+        return `Movies similar to "${sourceMovie.title}"`
+    
+      case "cast": {
+        if (!sourceMovie.cast || sourceMovie.cast.length === 0) {
+          return `Movies with similar cast as "${sourceMovie.title}"`
+        }
+        const castNames = sourceMovie.cast.slice(0, 2).join(", ")
+        return `Movies starring ${castNames}`
+      }
+    
+      case "director": {
+        if (!sourceMovie.directors || sourceMovie.directors.length === 0) {
+          return `Movies by the same director as "${sourceMovie.title}"`
+        }
+        const directorName = Array.isArray(sourceMovie.directors) 
+          ? sourceMovie.directors[0] 
+          : sourceMovie.directors
+        return `Movies directed by ${directorName}`
+      }
+    
+      case "genre":    
+        return `Movies in the same genre as "${sourceMovie.title}"`
+    
+      default:
+        return ""
     }
   }
 
