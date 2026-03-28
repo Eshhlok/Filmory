@@ -1,14 +1,16 @@
-
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
+from pydantic import BaseModel
+from datetime import datetime
+import uuid
 
 from backend import movies_df, cosine_sim
 from recommender import recommend
 from tmdb_client import search_movies_tmdb
 from data_store import load_credits, save_feedback
-from config import GENRE_MAP
+from config import GENRE_MAP,API_KEY
 
 app = FastAPI(title="Movie Recommender API")
 
@@ -211,13 +213,12 @@ def get_movie_details(movie_id: int):
         }
     else:
         # Movie not in database - fetch from TMDB API
-        TMDB_API_KEY = "YOUR_TMDB_API_KEY"  # Replace with your actual TMDB API key
-        
+                
         tmdb_url = f"https://api.themoviedb.org/3/movie/{movie_id}"
         
         try:
             response = requests.get(tmdb_url, params={
-                "api_key": TMDB_API_KEY,
+                "api_key": API_KEY,
                 "append_to_response": "credits"
             })
             
@@ -278,13 +279,13 @@ def get_languages():
 # ---------------------------
 class FeedbackRequest(BaseModel):
     rating: int = Field(..., ge=1, le=5)
-    comment: str | None = Field(None, max_length=500)
+    feedback: str | None = Field(None, max_length=500)
 
 
 @app.post("/feedback", status_code=201)
 def submit_feedback(body: FeedbackRequest):
     try:
-        save_feedback(body.rating, body.comment)
+        save_feedback(body.rating, body.feedback)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to save feedback.")
     return {"status": "ok"}

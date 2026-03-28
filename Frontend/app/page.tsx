@@ -8,6 +8,7 @@ import { LoadingScreen } from "@/components/loading-screen"
 import { Spinner } from "@/components/ui/spinner"
 import type { Movie, RecommendationType } from "@/lib/types"
 import { AnimatedMovieCard } from "@/components/animated-movie-card"
+import { FeedbackButton } from "@/components/feedback-button"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -344,6 +345,7 @@ export default function Home() {
 
         {/* Recommendation Mode Selector */}
         <div className="max-w-3xl mx-auto mb-10">
+          <FeedbackButton />
           <p className="text-center text-stone-500 text-sm mb-4">Choose recommendation mode</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {RECOMMENDATION_MODES.map(mode => {
