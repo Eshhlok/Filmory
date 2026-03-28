@@ -108,7 +108,25 @@ export default function Home() {
     setIsFallbackResults(is_fallback)
     setIsLoadingRecommendations(false)
   }
-
+  // Add this function inside your Home component (add it after the other functions like getRecommendations)
+  const fetchFullMovieDetails = async (movie: Movie): Promise<Movie> => {
+    // If we already have directors and cast data, return as-is
+    if (movie.directors?.length && movie.cast?.length) {
+      return movie
+    }
+  
+    try {
+      const res = await fetch(`${API_BASE}/movie/${movie.id}`)
+      if (res.ok) {
+        const fullMovie = await res.json()
+        // Merge the full details with existing movie data
+        return { ...movie, ...fullMovie }
+      }
+    } catch (error) {
+      console.error('Failed to fetch movie details:', error)
+    }
+    return movie
+  }
   const handleSelectSourceMovie = (movie: Movie) => {
     setSourceMovie(movie)
     setSearchQuery(movie.title)
@@ -243,7 +261,10 @@ export default function Home() {
                 <div className="w-56 sm:w-64">
                   <MovieCard
                     movie={sourceMovie}
-                    onClick={setSelectedMovie}
+                    onClick={async (movie) => {
+                      const fullMovie = await fetchFullMovieDetails(movie)
+                      setSelectedMovie(fullMovie)
+                    }}
                   />
                 </div>
               </div>
@@ -378,7 +399,10 @@ export default function Home() {
                   key={movie.id ?? `rec-${i}`}
                   movie={movie}
                   index={i}
-                  onClick={setSelectedMovie}
+                  onClick={async (movie) => {
+                    const fullMovie = await fetchFullMovieDetails(movie)
+                    setSelectedMovie(fullMovie)
+                  }}
                 />
               ))}
             </div>

@@ -161,6 +161,104 @@ def get_recommendations(
         "results": [format_movie(m, mode) for m in results],
     }
 
+# Add this new endpoint - place it after /recommend and before /languages
+
+@app.get("/movie/{movie_id}")
+def get_movie_details(movie_id: int):
+    """
+    Get full movie details including cast and directors.
+    Fetches from TMDB if movie not in database.
+    """
+    import requests
+    
+    # First, check if movie exists in your database
+    movie_row = movies_df[movies_df["id"] == movie_id]
+    
+    if not movie_row.empty:
+        # Movie is in your database - use local data
+        row = movie_row.iloc[0]
+        credits = credits_cache.get(movie_id, {})
+        
+        # Parse genre_ids if stored as string
+        genre_ids = row.get("genre_ids", [])
+        if isinstance(genre_ids, str):
+            import json
+            try:
+                genre_ids = json.loads(genre_ids)
+            except:
+                genre_ids = []
+        
+        # Get genre names
+        genre_names = []
+        for gid in genre_ids:
+            if gid in GENRE_MAP:
+                genre_names.append(GENRE_MAP[gid])
+        
+        return {
+            "id": movie_id,
+            "title": row.get("title"),
+            "overview": row.get("overview", ""),
+            "release_date": row.get("release_date", ""),
+            "original_language": row.get("language", ""),
+            "vote_average": row.get("rating", 0),
+            "vote_count": 0,
+            "poster_path": extract_poster_path(row.get("poster_url")),
+            "backdrop_path": extract_backdrop_path(row.get("backdrop_url")),
+            "genre_ids": genre_ids,
+            "genre_names": genre_names,
+            "cast": credits.get("full_cast", [])[:5],
+            "directors": credits.get("directors", []),
+        }
+    else:
+        # Movie not in database - fetch from TMDB API
+        TMDB_API_KEY = "YOUR_TMDB_API_KEY"  # Replace with your actual TMDB API key
+        
+        tmdb_url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+        
+        try:
+            response = requests.get(tmdb_url, params={
+                "api_key": TMDB_API_KEY,
+                "append_to_response": "credits"
+            })
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=404, detail="Movie not found")
+            
+            tmdb_data = response.json()
+            
+            # Extract cast (top 5)
+            cast = []
+            for actor in tmdb_data.get("credits", {}).get("cast", [])[:5]:
+                cast.append(actor.get("name"))
+            
+            # Extract directors
+            directors = []
+            for crew in tmdb_data.get("credits", {}).get("crew", []):
+                if crew.get("job") == "Director":
+                    directors.append(crew.get("name"))
+            
+            # Get genre names
+            genre_names = []
+            for genre in tmdb_data.get("genres", []):
+                genre_names.append(genre.get("name"))
+            
+            return {
+                "id": tmdb_data.get("id"),
+                "title": tmdb_data.get("title"),
+                "overview": tmdb_data.get("overview", ""),
+                "release_date": tmdb_data.get("release_date", ""),
+                "original_language": tmdb_data.get("original_language", ""),
+                "vote_average": tmdb_data.get("vote_average", 0),
+                "vote_count": tmdb_data.get("vote_count", 0),
+                "poster_path": tmdb_data.get("poster_path"),
+                "backdrop_path": tmdb_data.get("backdrop_path"),
+                "genre_ids": [g.get("id") for g in tmdb_data.get("genres", [])],
+                "genre_names": genre_names,
+                "cast": cast,
+                "directors": directors,
+            }
+        except requests.RequestException:
+            raise HTTPException(status_code=500, detail="Error fetching from TMDB")
 
 # ---------------------------
 # /languages
