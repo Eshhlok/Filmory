@@ -12,6 +12,14 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'https://movie-recommender-api-production-b9c7.up.railway.app/:path*',
+      },
+    ]
+  },
 }
 
 export default nextConfig
