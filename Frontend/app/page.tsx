@@ -10,7 +10,7 @@ import type { Movie, RecommendationType } from "@/lib/types"
 import { AnimatedMovieCard } from "@/components/animated-movie-card"
 import { FeedbackButton } from "@/components/feedback-button"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api"
 
 const RECOMMENDATION_MODES = [
   { id: "story"    as RecommendationType, label: "Story / Plot", icon: BookOpen,     description: "Similar themes and narratives" },
