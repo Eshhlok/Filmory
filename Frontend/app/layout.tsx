@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: 'Discover your next favorite film with intelligent, personalized recommendations',
   generator: 'v0.app',
   icons: {
-    icon:  '/favicon.ico',
+    icon:  '/icon1.svg',
     apple: '/apple-touch-icon.png',
   },
 }
