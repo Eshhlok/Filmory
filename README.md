@@ -182,8 +182,152 @@ If all 4 steps fail, _fallback_recommend() is invoked: fetches genre_ids, overvi
   <i>This screenshot illustrates genre-based recommendations, where movies sharing similar categories are prioritized, with higher-rated films ranked first in cases of equal genre overlap.</i>
 </p>
 
+---
+
+## 🌐 Live Demo
 
 
+```md
+https://filmory-movies.vercel.app
+```
+
+---
+
+## ⚙️ Complete Installation & Setup
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/Eshhlok/Filmory.git
+cd Filmory
+```
+### Frontend Setup (Next.js)
+
+**Install dependencies:**
+
+npm install
+
+**Start frontend server:**
+
+npm run dev
+
+### Backend Setup (FastAPI)
+
+cd backend
+
+**For Windows**
+python -m venv venv
+venv\Scripts\activate
+
+**For Mac/Linux**
+python3 -m venv venv
+source venv/bin/activate
+
+**Install backend dependencies:**
+
+pip install -r requirements.txt
+
+**Run FastAPI server:**
+
+uvicorn app:app --reload
+
+**Create a .env file inside the backend directory.**
+
+TMDB_API_KEY=your_tmdb_api_key
+
+SUPABASE_URL=your_supabase_project_url
+
+SUPABASE_KEY=your_supabase_anon_key
+
+DATABASE_URL=your_postgresql_connection_url
+
+### Supabase Database Setup
+
+Create a new project on Supabase.
+
+Required tables:
+
+movies
+credits
+feedback
+
+Import:
+
+movie metadata
+credits cache
+backdrop URLs
+
+Enable PostgreSQL connection pooling for better performance.
+
+### TMDB API Configuration
+
+Create an account on TMDB:
+
+https://www.themoviedb.org/
+
+Generate an API key and add it to your .env file.
+
+Filmory uses TMDB for:
+
+- multilingual movie metadata
+- search fallback
+- backdrop images
+- credits fetching
+
+### Generate Recommendation Data
+
+Run preprocessing scripts to:
+
+fetch multilingual movie data
+generate sparse TF-IDF matrix
+cache credits information
+optimize recommendation pipeline
+
+Example:
+
+python update_database.py
+
+### Start the Full Application
+
+Run both services simultaneously:
+
+**Frontend**
+npm run dev
+**Backend**
+uvicorn app:app --reload
+
+### Open Filmory
+
+Visit:
+
+http://localhost:3000
+
+## 🤝 Contributing
+
+Contributions, ideas, and suggestions are welcome.
+
+Use the feedback button available in my website.
+
+---
+
+## 📄 License
+
+This project is open-source and available under the MIT License.
+
+---
+
+## 👨‍💻 Author
+
+### Eshlok Agarwal
+
+* GitHub: [https://github.com/Eshhlok](https://github.com/Eshhlok)
+* LinkedIn: https://www.linkedin.com/in/eshlok-agarwal-134877380/
+
+---
+
+## ⭐ Support
+
+If you found this project useful, consider giving it a star on GitHub.
 
 
 
