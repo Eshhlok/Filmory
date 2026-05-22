@@ -4,6 +4,60 @@
 
 An intelligent recommendation platform supporting story, cast, director, and genre-based discovery across multiple languages using sparse similarity computation and memory-optimized architecture.
 
+## 🛠️ Tech Stack
+
+### 🎨 Frontend
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+
+---
+
+### ⚙️ Backend
+- FastAPI
+- Python
+- Scikit-learn
+- Pandas
+- NumPy
+
+---
+
+### 🧠 Recommendation & ML Engine
+- Sparse TF-IDF Vectorization
+- Cosine Similarity
+- Billing-Weighted Scoring
+- Multi-Modal Recommendation Routing
+
+---
+
+### 🗄️ Database & Storage
+- Supabase PostgreSQL
+- Threaded Connection Pooling
+
+---
+
+### ☁️ Deployment & Infrastructure
+- Vercel
+- Render
+- GitHub
+
+---
+
+### 🔗 APIs & External Services
+- TMDB API
+
+---
+
+### 📊 Core Features
+- Multilingual Recommendation System
+- Story / Cast / Director / Genre Modes
+- Sparse On-Demand Similarity Engine
+- Intelligent Title Resolution
+- Memory-Optimized Architecture
+- Free-Tier Cloud Optimization
+
 ## Summary and Background of the Invention
 Movie recommendation systems have been widely studied, but existing solutions suffer from three fundamental limitations. First, they predominantly operate on single-language English datasets, making them ill-suited for globally diverse audiences who consume content in Hindi, Tamil, Telugu, Korean, and other languages. Second, they rely on either collaborative filtering — which requires large volumes of user interaction data and therefore fails for new or low-traffic deployments — or pre-computed dense cosine similarity matrices that consume huge memory. Third, existing systems offer only a single recommendation modality, typically plot-based similarity, without any support for cast-driven, director-driven, or genre-driven discovery, forcing users into a one-size-fits-all experience regardless of their intent.
 To address these gaps, the proposed invention introduces a “Memory-Optimized Multilingual Multi-Modal Recommendation Architecture,” implemented and validated through Filmory. The central novelty of the system is its “Sparse On-Demand Similarity Engine,” which replaces the memory-intensive pre-computed N×N dense matrix with a SciPy sparse CSR TF-IDF matrix of approximately 5–10 MB. At query time, only the seed movie’s row vector is extracted and cosine similarity is computed on demand against the full sparse matrix, reducing total system RAM from approximately 700 MB to approximately 200 MB — a 71% reduction — while keeping per-query latency to around 50 milliseconds.
