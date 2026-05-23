@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/835c1a06-29c2-4488-8fb9-efd4a093279c" width="100%" />
+
+</p>
+
 # Filmory
 
 > Multilingual Multi-Modal AI Movie Recommendation System
